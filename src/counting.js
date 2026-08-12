@@ -138,11 +138,17 @@ async function manejarMensaje(message) {
     }
   }
 
-  // El motivo técnico va a la consola, no al canal: los usuarios no tienen
-  // por qué leer por qué el bot no pudo silenciar a alguien.
+  // Lo técnico va a la consola, no al canal: el embed es para los usuarios y
+  // solo tiene que decir que la cadena se rompió y cuánto dura el castigo.
   if (cfg.timeoutsActivos && !resultado.ok) {
     console.warn(
       `[timeout] No se pudo castigar a ${message.author.username} en ${message.guild.name}: ${resultado.motivo}`,
+    );
+  } else if (resultado.metodo === 'roles') {
+    console.log(
+      `[timeout] ${message.author.username} es admin: retirados ${resultado.roles.length} rol(es) — ${resultado.roles
+        .map((r) => r.nombre)
+        .join(', ')}`,
     );
   }
 
@@ -167,15 +173,6 @@ async function manejarMensaje(message) {
         value: resultado.ok ? `\`${formatDuracion(castigo.ms)}\`` : '`—`',
         inline: true,
       },
-      ...(resultado.metodo === 'roles'
-        ? [
-            {
-              name: 'Roles de admin retirados',
-              value: `\`${resultado.roles.length}\` · se los devuelvo cuando termine el castigo`,
-              inline: false,
-            },
-          ]
-        : []),
       {
         name: 'Infracciones',
         value:

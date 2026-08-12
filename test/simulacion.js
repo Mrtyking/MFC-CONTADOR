@@ -224,6 +224,12 @@ async function enviar(userId, texto) {
     'el embed no filtra motivos técnicos',
     !/permiso|rol está por encima|Missing|error/i.test(JSON.stringify(r.embeds[0]?.campos)),
   );
+  comprobar(
+    'el embed solo lleva los 5 campos de siempre',
+    Object.keys(r.embeds[0]?.campos ?? {}).join('|') ===
+      'Llegaron hasta|Récord|Timeout|Infracciones|Nivel',
+    Object.keys(r.embeds[0]?.campos ?? {}).join(', '),
+  );
 
   console.log('\n=== reincidencia (anti-spam) ===');
   const castigos = [];
