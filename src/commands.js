@@ -160,6 +160,14 @@ const definiciones = [
     .setContexts(InteractionContextType.Guild),
 
   new SlashCommandBuilder()
+    .setName('revisar')
+    .setDescription('Comprueba si el bot puede castigar (permisos y jerarquía de roles)')
+    .addUserOption((o) =>
+      o.setName('usuario').setDescription('Comprobar si a esta persona se le puede castigar'),
+    )
+    .setContexts(InteractionContextType.Guild),
+
+  new SlashCommandBuilder()
     .setName('ayuda')
     .setDescription('Cómo funciona el contador')
     .setContexts(InteractionContextType.Guild),
@@ -617,6 +625,67 @@ const handlers = {
     await interaction.reply(
       efimero(`\`${clave}\` = \`${valor}\`  (antes: \`${DEFAULTS[clave]}\` por defecto)`),
     );
+  },
+
+  async revisar(interaction) {
+    const guild = interaction.guild;
+    const yo = guild.members.me;
+    const miPos = yo.roles.highest.position;
+
+    const check = (b) => (b ? '✅' : '❌');
+    const embed = new EmbedBuilder().setColor(COLOR_INFO).setTitle('Revisión del bot');
+
+    embed.addFields({
+      name: 'Permisos',
+      value: [
+        `${check(yo.permissions.has(PermissionFlagsBits.ModerateMembers))} Aislar miembros — dar timeouts`,
+        `${check(yo.permissions.has(PermissionFlagsBits.ManageRoles))} Gestionar roles — castigar administradores`,
+        `${check(yo.permissions.has(PermissionFlagsBits.AddReactions))} Añadir reacciones`,
+      ].join('\n'),
+    });
+
+    const porEncima = guild.roles.cache.filter(
+      (r) => r.position > miPos && !r.managed && r.id !== guild.id,
+    );
+    embed.addFields({
+      name: 'Jerarquía',
+      value:
+        `Mi rol está en la posición \`${miPos}\`.\n` +
+        (porEncima.size
+          ? `❌ Hay **${porEncima.size} roles por encima del mío**. A quien tenga uno de esos no puedo tocarlo, ni siendo admin.\n\n**Arrastra mi rol arriba del todo** en Ajustes del servidor → Roles.`
+          : '✅ Mi rol está por encima de todos. Puedo castigar a cualquiera menos al dueño.'),
+    });
+
+    const objetivo = interaction.options.getUser('usuario');
+    if (objetivo) {
+      const member = await guild.members.fetch(objetivo.id).catch(() => null);
+      if (!member) {
+        embed.addFields({ name: `¿Puedo castigar a ${objetivo.username}?`, value: '❌ No está en el servidor.' });
+      } else {
+        const impedimento = sanciones.bloqueo(member);
+        const esAdmin = member.permissions.has(PermissionFlagsBits.Administrator);
+        const suPos = member.roles.highest.position;
+
+        let veredicto;
+        if (impedimento) {
+          veredicto = `❌ **No.** ${impedimento[0].toUpperCase()}${impedimento.slice(1)}.`;
+          if (impedimento.includes('por encima')) {
+            veredicto += `\nSu rol está en \`${suPos}\` y el mío en \`${miPos}\`. Necesito estar por encima de \`${suPos}\`.`;
+          }
+        } else if (esAdmin) {
+          const quitables = sanciones.rolesQuitables(member);
+          veredicto = quitables.size
+            ? `✅ **Sí.** Es administrador, así que le quitaría ${quitables.size} rol(es), aplicaría el timeout y se los devolvería al terminar.`
+            : '❌ Es administrador y no tengo ningún rol suyo que pueda quitar.';
+        } else {
+          veredicto = '✅ **Sí.** Timeout normal, sin tocarle los roles.';
+        }
+
+        embed.addFields({ name: `¿Puedo castigar a ${objetivo.username}?`, value: veredicto });
+      }
+    }
+
+    await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
   },
 
   async ayuda(interaction) {
