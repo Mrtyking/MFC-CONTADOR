@@ -339,19 +339,19 @@ const handlers = {
       .setTitle('Contador')
       .setDescription(`Va el **${canal.actual + 1}**`)
       .addFields(
-        { name: 'Actual', value: `${canal.actual}`, inline: true },
-        { name: 'Récord', value: `${canal.record}`, inline: true },
+        { name: 'Actual', value: `\`${canal.actual}\``, inline: true },
+        { name: 'Récord', value: `\`${canal.record}\``, inline: true },
         {
           name: 'Último',
-          value: canal.ultimoUsuario ? `<@${canal.ultimoUsuario}>` : '—',
+          value: canal.ultimoUsuario ? `<@${canal.ultimoUsuario}>` : '`—`',
           inline: true,
         },
-        { name: 'Aciertos', value: `${canal.totalAciertos}`, inline: true },
-        { name: 'Cadenas rotas', value: `${canal.totalFallos}`, inline: true },
-        { name: 'Nivel', value: `${info.nivel}`, inline: true },
+        { name: 'Aciertos', value: `\`${canal.totalAciertos}\``, inline: true },
+        { name: 'Cadenas rotas', value: `\`${canal.totalFallos}\``, inline: true },
+        { name: 'Nivel', value: `\`${info.nivel}\``, inline: true },
         {
           name: 'Progreso',
-          value: `\`[${info.barra}]\` ${info.xp} / ${info.siguiente}  ·  faltan **${info.faltan}**`,
+          value: `\`[${info.barra}] ${info.xp} / ${info.siguiente}\`  ·  faltan \`${info.faltan}\``,
         },
       );
 
@@ -376,7 +376,7 @@ const handlers = {
       const info = levels.calcular(canal.xp, cfg);
       embed.addFields({
         name: `Nivel del canal — ${info.nivel}`,
-        value: `\`[${info.barra}]\` ${info.xp} / ${info.siguiente}`,
+        value: `\`[${info.barra}] ${info.xp} / ${info.siguiente}\``,
       });
     }
 
@@ -390,18 +390,18 @@ const handlers = {
       u.ultimaInfraccion && Date.now() - u.ultimaInfraccion <= ventanaMs ? u.infracciones : 0;
 
     embed.addFields(
-      { name: 'Aciertos', value: `${u.aciertos}`, inline: true },
-      { name: 'Fallos', value: `${u.fallos}`, inline: true },
-      { name: 'Mejor racha', value: `${u.mejorRacha}`, inline: true },
-      { name: 'Racha actual', value: `${u.rachaActual}`, inline: true },
+      { name: 'Aciertos', value: `\`${u.aciertos}\``, inline: true },
+      { name: 'Fallos', value: `\`${u.fallos}\``, inline: true },
+      { name: 'Mejor racha', value: `\`${u.mejorRacha}\``, inline: true },
+      { name: 'Racha actual', value: `\`${u.rachaActual}\``, inline: true },
       {
         name: 'Infracciones activas',
         value: infraccionesVivas
-          ? `${infraccionesVivas} (última ${tsRelativo(u.ultimaInfraccion)})`
-          : '0',
+          ? `\`${infraccionesVivas}\` · última ${tsRelativo(u.ultimaInfraccion)}`
+          : '`0`',
         inline: true,
       },
-      { name: 'Tiempo silenciado', value: formatDuracion(u.totalTimeoutMs), inline: true },
+      { name: 'Tiempo silenciado', value: `\`${formatDuracion(u.totalTimeoutMs)}\``, inline: true },
     );
 
     const sancion = sanciones.sancionDe(interaction.guild.id, objetivo.id);

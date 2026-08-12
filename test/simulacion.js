@@ -202,7 +202,18 @@ async function enviar(userId, texto) {
   comprobar('C recibe timeout', r.timeouts.length === 1);
   comprobar('~3-4 min de castigo', min1 >= 3 && min1 <= 5, `${min1} min`);
   comprobar('embed dice qué se esperaba', /se esperaba `3`/.test(r.embeds[0]?.desc ?? ''));
-  comprobar('llegaron hasta 2', r.embeds[0]?.campos['Llegaron hasta'] === '2');
+  comprobar('llegaron hasta 2', r.embeds[0]?.campos['Llegaron hasta'] === '`2`');
+  comprobar(
+    'los valores van con fondo oscuro',
+    ['Llegaron hasta', 'Récord', 'Timeout', 'Infracciones', 'Nivel'].every((c) =>
+      r.embeds[0]?.campos[c]?.startsWith('`'),
+    ),
+    JSON.stringify(r.embeds[0]?.campos),
+  );
+  comprobar(
+    'el embed no filtra motivos técnicos',
+    !/permiso|rol está por encima|Missing|error/i.test(JSON.stringify(r.embeds[0]?.campos)),
+  );
 
   console.log('\n=== reincidencia (anti-spam) ===');
   const castigos = [];

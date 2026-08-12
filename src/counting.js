@@ -89,7 +89,7 @@ async function manejarMensaje(message) {
         .setDescription(`El canal subió al **nivel ${nivelNuevo}**.`)
         .addFields({
           name: 'Progreso',
-          value: `\`[${info.barra}]\` ${info.xp} / ${info.siguiente}`,
+          value: `\`[${info.barra}] ${info.xp} / ${info.siguiente}\``,
         });
       try {
         await message.channel.send({ embeds: [embed] });
@@ -138,6 +138,14 @@ async function manejarMensaje(message) {
     }
   }
 
+  // El motivo técnico va a la consola, no al canal: los usuarios no tienen
+  // por qué leer por qué el bot no pudo silenciar a alguien.
+  if (cfg.timeoutsActivos && !resultado.ok) {
+    console.warn(
+      `[timeout] No se pudo castigar a ${message.author.username} en ${message.guild.name}: ${resultado.motivo}`,
+    );
+  }
+
   const info = levels.calcular(canal.xp, cfg);
   const embed = new EmbedBuilder()
     .setColor(COLOR_FAIL)
@@ -152,21 +160,18 @@ async function manejarMensaje(message) {
         : `Envió \`${numero}\` — se esperaba \`${esperado}\``,
     )
     .addFields(
-      { name: 'Llegaron hasta', value: `${llegoHasta}`, inline: true },
-      { name: 'Récord', value: `${canal.record}`, inline: true },
+      { name: 'Llegaron hasta', value: `\`${llegoHasta}\``, inline: true },
+      { name: 'Récord', value: `\`${canal.record}\``, inline: true },
       {
         name: 'Timeout',
-        value: resultado.ok ? `\`${formatDuracion(castigo.ms)}\`` : `— (${resultado.motivo})`,
+        value: resultado.ok ? `\`${formatDuracion(castigo.ms)}\`` : '`—`',
         inline: true,
       },
       ...(resultado.metodo === 'roles'
         ? [
             {
-              name: `Roles retirados (${resultado.roles.length})`,
-              value: `Es administrador, así que le quité los roles para que el timeout le afecte. Se los devuelvo solo cuando termine.\n${resultado.roles
-                .slice(0, 10)
-                .map((r) => `\`${r.nombre}\``)
-                .join(', ')}${resultado.roles.length > 10 ? '…' : ''}`,
+              name: 'Roles retirados',
+              value: `\`${resultado.roles.length}\` · se los devuelvo cuando termine el castigo`,
               inline: false,
             },
           ]
@@ -175,11 +180,11 @@ async function manejarMensaje(message) {
         name: 'Infracciones',
         value:
           castigo.multiplicador > 1
-            ? `${castigo.infracciones} · castigo ×${castigo.multiplicador}`
-            : `${castigo.infracciones}`,
+            ? `\`${castigo.infracciones}\` · castigo \`×${castigo.multiplicador}\``
+            : `\`${castigo.infracciones}\``,
         inline: false,
       },
-      { name: 'Nivel', value: `\`[${info.barra}]\` ${info.xp} / ${info.siguiente}`, inline: false },
+      { name: 'Nivel', value: `\`[${info.barra}] ${info.xp} / ${info.siguiente}\``, inline: false },
     )
     .setFooter({ text: 'El contador vuelve a 1 · Respeta el turno' })
     .setTimestamp();
