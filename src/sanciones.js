@@ -18,6 +18,7 @@ const store = require('./store');
 
 const MAX_TIMER = 20 * 24 * 60 * 60 * 1000; // setTimeout se rompe pasados ~24,8 días
 const BARRIDO_MS = 30 * 1000;
+const GRACIA_MS = 20 * 1000; // margen antes de fiarse de que un timeout "no está"
 const CADUCIDAD_MS = 60 * 24 * 60 * 60 * 1000; // si en 60 días no se pudo devolver, se olvida
 
 const timers = new Map();
@@ -104,7 +105,13 @@ async function castigar(member, ms, razon) {
 
   // Se guarda ANTES de tocar nada: si el bot se cae aquí, al arrancar los devuelve
   const lista = pendientes(member.guild.id);
-  lista[member.id] = { roles: ids, nombres: guardados.map((r) => r.nombre), hasta, razon };
+  lista[member.id] = {
+    roles: ids,
+    nombres: guardados.map((r) => r.nombre),
+    desde: Date.now(),
+    hasta,
+    razon,
+  };
   store.guardarAhora();
 
   try {
@@ -189,18 +196,68 @@ function programar(client, guildId, userId, hasta) {
   timers.set(k, t);
 }
 
-/** Repasa todas las sanciones: devuelve las vencidas y reprograma las vivas. */
+/**
+ * ¿Le quitaron el timeout a mano desde Discord?
+ * Si es así, el castigo se acabó y hay que devolverle los roles ya.
+ */
+async function timeoutLevantadoAMano(guild, userId, sancion) {
+  // Margen para que no cuente como "levantado" lo que aún no ha llegado a Discord
+  if (Date.now() - (sancion.desde ?? 0) < GRACIA_MS) return false;
+
+  const member = await guild.members.fetch(userId).catch(() => null);
+  if (!member) return false;
+
+  const hasta = member.communicationDisabledUntilTimestamp;
+  return !hasta || hasta <= Date.now();
+}
+
+/**
+ * Repasa todas las sanciones:
+ *   · devuelve los roles de las que ya vencieron
+ *   · devuelve los roles si alguien levantó el timeout a mano desde Discord
+ *   · reprograma las que siguen vivas
+ */
 async function barrer(client) {
   const datos = store.db().guilds ?? {};
   for (const [guildId, g] of Object.entries(datos)) {
-    if (!g.sanciones) continue;
-    for (const [userId, sancion] of Object.entries(g.sanciones)) {
+    if (!g.sanciones || !Object.keys(g.sanciones).length) continue;
+    const guild = client.guilds.cache.get(guildId);
+    if (!guild) continue;
+
+    for (const [userId, sancion] of Object.entries({ ...g.sanciones })) {
       if (sancion.hasta <= Date.now()) {
-        const guild = client.guilds.cache.get(guildId);
-        if (guild) await devolver(guild, userId, 'se acabó el timeout');
+        await devolver(guild, userId, 'se acabó el timeout');
+      } else if (await timeoutLevantadoAMano(guild, userId, sancion)) {
+        const r = await devolver(guild, userId, 'le quitaron el timeout a mano');
+        if (r.ok) {
+          console.log(`[sanciones] Timeout levantado a mano: roles devueltos a ${userId} en ${guild.name}`);
+        }
       } else if (!timers.has(clave(guildId, userId))) {
         programar(client, guildId, userId, sancion.hasta);
       }
+    }
+  }
+}
+
+/**
+ * Reacción inmediata cuando cambia un miembro. Solo funciona si está activado
+ * el intent SERVER MEMBERS; si no, del tema se encarga el barrido periódico.
+ */
+async function alCambiarMiembro(antes, despues) {
+  const guild = despues.guild;
+  if (!guild) return;
+  const sancion = pendientes(guild.id)[despues.id];
+  if (!sancion) return;
+
+  const seguiaCastigado = antes?.communicationDisabledUntilTimestamp;
+  const ahoraLibre =
+    !despues.communicationDisabledUntilTimestamp ||
+    despues.communicationDisabledUntilTimestamp <= Date.now();
+
+  if (seguiaCastigado && ahoraLibre) {
+    const r = await devolver(guild, despues.id, 'le quitaron el timeout a mano');
+    if (r.ok) {
+      console.log(`[sanciones] Timeout levantado a mano: roles devueltos a ${despues.id} en ${guild.name}`);
     }
   }
 }
@@ -220,4 +277,14 @@ function sancionDe(guildId, userId) {
   return pendientes(guildId)[userId] ?? null;
 }
 
-module.exports = { castigar, devolver, programar, barrer, iniciar, sancionDe, rolesQuitables, bloqueo };
+module.exports = {
+  castigar,
+  devolver,
+  programar,
+  barrer,
+  iniciar,
+  sancionDe,
+  rolesQuitables,
+  bloqueo,
+  alCambiarMiembro,
+};

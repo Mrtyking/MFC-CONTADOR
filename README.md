@@ -20,8 +20,10 @@ El token se saca en [Discord Developer Portal](https://discord.com/developers/ap
 
 ### 2. Activar el intent de contenido
 
-En el portal → tu app → **Bot** → **Privileged Gateway Intents** → activa **MESSAGE CONTENT INTENT**.
-Sin eso el bot no puede leer los números y ni siquiera arranca.
+En el portal → tu app → **Bot** → **Privileged Gateway Intents**:
+
+- **MESSAGE CONTENT INTENT** — obligatorio. Sin él el bot no puede leer los números y ni siquiera arranca.
+- **SERVER MEMBERS INTENT** — recomendado. Sirve para devolver los roles al instante cuando alguien levanta un timeout a mano. Sin él el bot arranca igual, solo tarda hasta 30 segundos.
 
 ### 3. Invitar el bot
 
@@ -72,6 +74,7 @@ Y ya. La gente escribe `1`, `2`, `3`… el bot reacciona con el check a cada aci
 | `/quitarcanal [canal] [borrar_datos]` | 🔒 | Deja de contar ahí |
 | `/reiniciar [numero]` | 🔒 | Reinicia el conteo |
 | `/quitartimeout <usuario>` | 🔒 | Quita el timeout y devuelve los roles retirados |
+| `/devolverroles <usuario>` | 🔒 | Devuelve los roles sin tocar el timeout |
 | `/perdon <usuario>` | 🔒 | Lo mismo + borra las infracciones acumuladas |
 | `/config ver \| poner \| reset` | 🔒 | Ajustes del servidor |
 | `/permisos ver \| rol \| comando` | 🔒 | Quién puede usar cada comando |
@@ -128,12 +131,24 @@ Si prefieres que le quite todos los roles que alcance, no solo los de admin:
 /config poner ajuste:quitarSoloRolesAdmin valor:false
 ```
 
-Los roles se apuntan en disco *antes* de tocarlos, así que aunque el bot se caiga o se reinicie a mitad del castigo, al arrancar los devuelve. Cada 30 segundos repasa si hay castigos vencidos. Si la persona se salió del servidor, se los guarda y se los devuelve cuando vuelva.
+Los roles se apuntan en disco *antes* de tocarlos, así que aunque el bot se caiga o se reinicie a mitad del castigo, al arrancar los devuelve. Si la persona se salió del servidor, se los guarda y se los devuelve cuando vuelva.
 
-Para levantarlo antes de tiempo:
+### Los roles vuelven pase lo que pase
+
+Hay tres formas de que un castigo termine, y en las tres se devuelven los roles:
+
+| Cómo termina | Qué hace el bot |
+|---|---|
+| Se cumple el tiempo | Los devuelve solo |
+| `/quitartimeout @usuario` | Quita el timeout y los devuelve |
+| **Un mod quita el timeout a mano** desde Discord | Lo detecta y los devuelve solo |
+
+El tercer caso funciona de dos maneras a la vez: al instante si está activado **SERVER MEMBERS INTENT** en el portal, y como red de seguridad un repaso cada 30 segundos que funciona sin ningún intent. Si el intent está apagado el bot arranca igual y avisa por consola; solo tarda un poco más.
+
+Y si aun así algo se queda colgado, a mano:
 
 ```
-/quitartimeout @usuario
+/devolverroles @usuario
 ```
 
 ### Lo que no se puede hacer

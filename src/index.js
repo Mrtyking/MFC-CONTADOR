@@ -9,6 +9,7 @@ const {
   Events,
   MessageFlags,
   PermissionFlagsBits,
+  IntentsBitField,
 } = require('discord.js');
 const store = require('./store');
 const permisos = require('./permisos');
@@ -24,13 +25,18 @@ if (!TOKEN) {
 
 store.cargar();
 
+const INTENTS_BASE = [
+  GatewayIntentBits.Guilds,
+  GatewayIntentBits.GuildMessages,
+  GatewayIntentBits.MessageContent, // intent privilegiado: hay que activarlo en el portal
+];
+
+// GuildMembers es opcional: con él el bot se entera al instante de que alguien
+// levantó un timeout a mano. Sin él lo detecta igual, pero en el barrido de
+// cada 30 s. Si no está activado en el portal, se arranca sin él.
 const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent, // intent privilegiado: hay que activarlo en el portal
-  ],
-  partials: [Partials.Message, Partials.Channel],
+  intents: [...INTENTS_BASE, GatewayIntentBits.GuildMembers],
+  partials: [Partials.Message, Partials.Channel, Partials.GuildMember],
 });
 
 /** Permisos que necesita el bot para funcionar entero. */
@@ -125,6 +131,15 @@ client.on(Events.MessageDelete, async (message) => {
   }
 });
 
+// Alguien levantó un timeout a mano desde Discord: devolverle los roles ya
+client.on(Events.GuildMemberUpdate, async (antes, despues) => {
+  try {
+    await sanciones.alCambiarMiembro(antes, despues);
+  } catch (err) {
+    console.error('[miembro]', err);
+  }
+});
+
 client.on(Events.MessageUpdate, async (antes, despues) => {
   try {
     if (despues.partial) await despues.fetch().catch(() => null);
@@ -152,7 +167,26 @@ async function apagar(senal) {
 process.on('SIGINT', () => apagar('SIGINT'));
 process.on('SIGTERM', () => apagar('SIGTERM'));
 
-client.login(TOKEN).catch(async (err) => {
+async function arrancar() {
+  try {
+    await client.login(TOKEN);
+    return;
+  } catch (err) {
+    if (!/disallowed intents/i.test(err.message)) throw err;
+  }
+
+  // El portal no tiene activado SERVER MEMBERS: se arranca sin ese intent.
+  console.warn(
+    '[intents] SERVER MEMBERS INTENT está desactivado en el portal.\n' +
+      '          El bot funciona igual, pero tardará hasta 30 s en devolver los roles\n' +
+      '          cuando alguien levante un timeout a mano. Para que sea instantáneo,\n' +
+      '          actívalo en Portal → tu app → Bot → Privileged Gateway Intents.',
+  );
+  client.options.intents = new IntentsBitField(INTENTS_BASE);
+  await client.login(TOKEN);
+}
+
+arrancar().catch(async (err) => {
   console.error('No pude iniciar sesión:', err.message);
   if (/intent/i.test(err.message)) {
     console.error(

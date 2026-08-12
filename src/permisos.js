@@ -31,6 +31,7 @@ const NIVELES = {
   permisos: ADMIN,
   perdon: ADMIN,
   quitartimeout: ADMIN,
+  devolverroles: ADMIN,
   revisar: ADMIN,
   // Consulta
   contador: PUBLICO,

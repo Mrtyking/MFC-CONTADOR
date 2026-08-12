@@ -49,6 +49,7 @@ const clienteFalso = { emojis: { cache: new Map() }, guilds: { cache: new Map() 
 
 const guildFalso = {
   id: GUILD,
+  name: 'Servidor de prueba',
   ownerId: DUENO,
   roles: { cache: rolesDelServidor },
   members: {
@@ -296,6 +297,37 @@ async function enviar(userId, texto) {
   await sanciones.devolver(guildFalso, 'ADMIN2', 'prueba');
   comprobar('y vuelven los 3', admin2.roles.cache.size === 3);
   delete store.getGuild(GUILD).config.quitarSoloRolesAdmin;
+
+  console.log('\n=== le quitan el timeout a mano desde Discord ===');
+  const admin3 = miembro('ADMIN3', { roles: ['r_admin', 'r_vip'] });
+  await sanciones.castigar(admin3, 60 * 60 * 1000, 'prueba'); // 1 hora
+  comprobar('castigado y sin rol de admin', !admin3.roles.cache.has('r_admin'));
+
+  // Un mod le quita el timeout desde la interfaz de Discord (no con /quitartimeout)
+  const antes = { communicationDisabledUntilTimestamp: admin3.communicationDisabledUntilTimestamp };
+  admin3.communicationDisabledUntilTimestamp = null;
+
+  await sanciones.alCambiarMiembro(antes, admin3);
+  comprobar(
+    'el bot lo detecta y le devuelve los roles',
+    admin3.roles.cache.has('r_admin') && admin3.roles.cache.has('r_vip'),
+  );
+  comprobar('y limpia la sanción pendiente', sanciones.sancionDe(GUILD, 'ADMIN3') === null);
+
+  console.log('\n=== y si el intent está apagado, lo pilla el barrido ===');
+  const admin4 = miembro('ADMIN4', { roles: ['r_admin'] });
+  await sanciones.castigar(admin4, 60 * 60 * 1000, 'prueba');
+  admin4.communicationDisabledUntilTimestamp = null; // se lo quitan a mano
+  // El margen de gracia evita falsos positivos recién aplicado el castigo
+  await sanciones.barrer(clienteFalso);
+  comprobar(
+    'dentro del margen de gracia no hace nada todavía',
+    sanciones.sancionDe(GUILD, 'ADMIN4') !== null,
+  );
+  sanciones.sancionDe(GUILD, 'ADMIN4').desde = Date.now() - 60_000; // simulamos que pasó el margen
+  await sanciones.barrer(clienteFalso);
+  comprobar('pasado el margen, el barrido le devuelve los roles', admin4.roles.cache.has('r_admin'));
+  comprobar('y limpia la sanción', sanciones.sancionDe(GUILD, 'ADMIN4') === null);
 
   console.log('\n=== a quién NO se puede tocar ===');
   const dueno = miembro(DUENO, { roles: ['r_admin'] });

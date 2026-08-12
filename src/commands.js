@@ -91,6 +91,12 @@ const definiciones = [
     .setContexts(InteractionContextType.Guild),
 
   new SlashCommandBuilder()
+    .setName('devolverroles')
+    .setDescription('Devuelve los roles que se le retiraron, sin tocar el timeout')
+    .addUserOption((o) => o.setName('usuario').setDescription('A quién').setRequired(true))
+    .setContexts(InteractionContextType.Guild),
+
+  new SlashCommandBuilder()
     .setName('perdon')
     .setDescription('Quita el timeout, devuelve los roles y borra las infracciones acumuladas')
     .addUserOption((o) => o.setName('usuario').setDescription('A quién perdonar').setRequired(true))
@@ -481,6 +487,37 @@ const handlers = {
 
   async perdon(interaction) {
     await levantarCastigo(interaction, { borrarInfracciones: true });
+  },
+
+  async devolverroles(interaction) {
+    const objetivo = interaction.options.getUser('usuario');
+    const sancion = sanciones.sancionDe(interaction.guild.id, objetivo.id);
+
+    if (!sancion) {
+      return interaction.reply(
+        efimero(`<@${objetivo.id}> no tiene ningún rol retirado por mí.`),
+      );
+    }
+
+    const r = await sanciones.devolver(
+      interaction.guild,
+      objetivo.id,
+      `Devueltos a mano por ${interaction.user.tag}`,
+    );
+
+    await interaction.reply({
+      embeds: [
+        new EmbedBuilder()
+          .setColor(r.ok ? COLOR_OK : COLOR_FAIL)
+          .setDescription(
+            r.ok
+              ? `Roles devueltos a <@${objetivo.id}>: ${(sancion.nombres ?? [])
+                  .map((n) => `\`${n}\``)
+                  .join(', ')}\nSigue con el timeout puesto, si lo tenía.`
+              : `No pude devolvérselos: ${r.motivo}`,
+          ),
+      ],
+    });
   },
 
   async permisos(interaction) {
