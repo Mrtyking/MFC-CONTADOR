@@ -1,0 +1,15 @@
+# Secretos: el token da control total del bot
+.env
+.env.local
+
+# Datos del bot (contador, niveles, estadísticas)
+data/
+
+node_modules/
+*.log
+npm-debug.log*
+
+# Configuración local de editores/herramientas
+.claude/settings.local.json
+.vscode/
+.idea/
