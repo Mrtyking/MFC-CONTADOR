@@ -170,7 +170,7 @@ async function manejarMensaje(message) {
       ...(resultado.metodo === 'roles'
         ? [
             {
-              name: 'Roles retirados',
+              name: 'Roles de admin retirados',
               value: `\`${resultado.roles.length}\` · se los devuelvo cuando termine el castigo`,
               inline: false,
             },

@@ -18,6 +18,10 @@ const DEFAULTS = {
 
   // --- Timeouts ---
   timeoutsActivos: true,
+  // Para castigar a un admin hay que quitarle roles. Con esto en true solo se
+  // le quitan los que dan permiso de Administrador; los de color, VIP y demás
+  // se quedan. En false se le quitan todos los que el bot alcance.
+  quitarSoloRolesAdmin: true,
   minutosPorNumero: 1, // minutos = número arruinado × este factor
   timeoutMinimoMin: 3,
   timeoutMaximoMin: 40320, // 28 días (máximo que permite Discord)
@@ -43,6 +47,7 @@ const ESQUEMA = {
   borrarInvalidos: { tipo: 'bool' },
   avisarBorrados: { tipo: 'bool' },
   timeoutsActivos: { tipo: 'bool' },
+  quitarSoloRolesAdmin: { tipo: 'bool' },
   minutosPorNumero: { tipo: 'num', min: 0.1, max: 60 },
   timeoutMinimoMin: { tipo: 'num', min: 1, max: 40320 },
   timeoutMaximoMin: { tipo: 'num', min: 1, max: 40320 },

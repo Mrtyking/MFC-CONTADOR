@@ -75,6 +75,7 @@ Y ya. La gente escribe `1`, `2`, `3`… el bot reacciona con el check a cada aci
 | `/perdon <usuario>` | 🔒 | Lo mismo + borra las infracciones acumuladas |
 | `/config ver \| poner \| reset` | 🔒 | Ajustes del servidor |
 | `/permisos ver \| rol \| comando` | 🔒 | Quién puede usar cada comando |
+| `/revisar [usuario]` | 🔒 | Comprueba permisos y jerarquía: por qué falla o no un castigo |
 
 🔒 = solo el rol con permiso y el dueño del bot. Ver [Permisos](#permisos).
 
@@ -117,9 +118,15 @@ Si aguantas esas 6 horas sin romper nada, se te olvidan las infracciones y vuelv
 Discord **ignora el timeout de quien tiene el permiso Administrador**: se lo puedes poner, pero sigue escribiendo como si nada. El bot resuelve esto así:
 
 1. Detecta que el timeout normal no le va a afectar.
-2. Le **quita los roles** y apunta cuáles eran.
+2. Le quita **solo los roles que dan permiso de Administrador**, y apunta cuáles eran. Los roles de color, VIP o decorativos **no se tocan**: no estorban para el timeout.
 3. Ya sin permisos de admin, le aplica el timeout.
 4. Cuando el castigo termina, **le devuelve los roles solo**.
+
+Si prefieres que le quite todos los roles que alcance, no solo los de admin:
+
+```
+/config poner ajuste:quitarSoloRolesAdmin valor:false
+```
 
 Los roles se apuntan en disco *antes* de tocarlos, así que aunque el bot se caiga o se reinicie a mitad del castigo, al arrancar los devuelve. Cada 30 segundos repasa si hay castigos vencidos. Si la persona se salió del servidor, se los guarda y se los devuelve cuando vuelva.
 
@@ -203,6 +210,7 @@ La fórmula es `xpBase × (nivel+1) ^ xpExponente`. Sube `xpExponente` para hace
 | `borrarInvalidos` | `false` | Borrar mensajes que no son números |
 | `avisarBorrados` | `true` | Avisar si borran/editan el último número |
 | `timeoutsActivos` | `true` | Aplicar timeouts |
+| `quitarSoloRolesAdmin` | `true` | Al castigar a un admin, quitarle solo los roles de admin |
 | `minutosPorNumero` | `1` | Minutos de castigo por cada número |
 | `timeoutMinimoMin` | `3` | Castigo mínimo |
 | `timeoutMaximoMin` | `40320` | Castigo máximo (28 días, tope de Discord) |

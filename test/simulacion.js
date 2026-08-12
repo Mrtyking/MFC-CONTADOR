@@ -11,7 +11,7 @@ const fs = require('node:fs');
 
 process.env.MFC_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'mfc-test-'));
 
-const { Collection } = require('discord.js');
+const { Collection, PermissionFlagsBits } = require('discord.js');
 const store = require('../src/store');
 const levels = require('../src/levels');
 const sanciones = require('../src/sanciones');
@@ -30,16 +30,20 @@ let timeoutsAplicados = [];
 /* --- Doble de Discord --------------------------------------------- */
 
 const rolesDelServidor = new Collection();
-function rol(id, nombre, position, managed = false) {
-  const r = { id, name: nombre, position, managed };
+function rol(id, nombre, position, managed = false, esAdmin = false) {
+  const r = { id, name: nombre, position, managed, permissions: permisosDe(esAdmin) };
   rolesDelServidor.set(id, r);
   return r;
 }
+function permisosDe(esAdmin) {
+  return { has: (flag) => (esAdmin ? flag === PermissionFlagsBits.Administrator : false) };
+}
 rol(GUILD, '@everyone', 0); // el rol @everyone tiene el id del servidor
-rol('r_admin', 'Admin', 50);
+rol('r_admin', 'Admin', 50, false, true);
 rol('r_vip', 'VIP', 20);
+rol('r_color', 'Color rosita', 15);
 rol('r_bot_integracion', 'Bot (gestionado)', 10, true);
-rol('r_intocable', 'Fundador', 900);
+rol('r_intocable', 'Fundador', 900, false, true);
 
 const clienteFalso = { emojis: { cache: new Map() }, guilds: { cache: new Map() } };
 
@@ -58,18 +62,25 @@ const guildFalso = {
 };
 clienteFalso.guilds.cache.set(GUILD, guildFalso);
 
-function hacerMiembro(id, { esAdmin = false, roles = [], porEncima = false } = {}) {
+function hacerMiembro(id, { roles = [], porEncima = false } = {}) {
   const cache = new Collection();
   for (const rid of roles) cache.set(rid, rolesDelServidor.get(rid));
+
+  // Igual que en Discord: eres admin si ALGUNO de tus roles da ese permiso
+  const esAdmin = () =>
+    [...cache.values()].some((r) => r?.permissions?.has(PermissionFlagsBits.Administrator));
 
   const m = {
     id,
     client: clienteFalso,
     guild: guildFalso,
     communicationDisabledUntilTimestamp: null,
+    get permissions() {
+      return { has: (flag) => flag === PermissionFlagsBits.Administrator && esAdmin() };
+    },
     // moderatable = false si es admin (Discord ignora el timeout de los admins)
     get moderatable() {
-      return !esAdmin && this.manageable;
+      return !esAdmin() && this.manageable;
     },
     // manageable = false si su rol está por encima del del bot o si es el dueño
     get manageable() {
@@ -79,11 +90,9 @@ function hacerMiembro(id, { esAdmin = false, roles = [], porEncima = false } = {
       cache,
       async remove(ids, _razon) {
         for (const rid of [].concat(ids)) cache.delete(rid);
-        if (![...cache.keys()].some((r) => r === 'r_admin')) esAdmin = false;
       },
       async add(ids, _razon) {
         for (const rid of [].concat(ids)) cache.set(rid, rolesDelServidor.get(rid));
-        if ([...cache.keys()].includes('r_admin')) esAdmin = true;
       },
     },
     async timeout(ms, razon) {
@@ -250,33 +259,50 @@ async function enviar(userId, texto) {
     console.log(`   número ${String(n).padStart(6)} → ${formatDuracion(c.ms)}`);
   }
 
-  console.log('\n=== castigar a un ADMIN (quitando roles) ===');
-  const admin = miembro('ADMIN', { esAdmin: true, roles: ['r_admin', 'r_vip', 'r_bot_integracion'] });
+  console.log('\n=== castigar a un ADMIN (solo se le quitan los roles de admin) ===');
+  const admin = miembro('ADMIN', {
+
+    roles: ['r_admin', 'r_vip', 'r_color', 'r_bot_integracion'],
+  });
   comprobar('el timeout normal no le afecta', admin.moderatable === false);
 
   const res = await sanciones.castigar(admin, 5000, 'prueba');
   comprobar('el castigo se aplica igual', res.ok === true, `método: ${res.metodo}`);
   comprobar('método = quitar roles', res.metodo === 'roles');
   comprobar('quedó silenciado', admin.communicationDisabledUntilTimestamp !== null);
-  comprobar('le quitó Admin y VIP', !admin.roles.cache.has('r_admin') && !admin.roles.cache.has('r_vip'));
+  comprobar('le quitó el rol de Admin', !admin.roles.cache.has('r_admin'));
+  comprobar(
+    'CONSERVA sus roles normales (VIP y color)',
+    admin.roles.cache.has('r_vip') && admin.roles.cache.has('r_color'),
+    'solo se le quita lo que da permiso de Administrador',
+  );
   comprobar(
     'NO tocó el rol gestionado por integración',
     admin.roles.cache.has('r_bot_integracion'),
     'los roles de bots/boosters no se pueden quitar',
   );
   const guardada = sanciones.sancionDe(GUILD, 'ADMIN');
-  comprobar('quedó guardado qué devolverle', guardada?.roles.length === 2, JSON.stringify(guardada?.nombres));
+  comprobar('solo hay 1 rol que devolver', guardada?.roles.length === 1, JSON.stringify(guardada?.nombres));
 
   const dev = await sanciones.devolver(guildFalso, 'ADMIN', 'prueba');
-  comprobar('los roles vuelven', dev.ok && admin.roles.cache.has('r_admin') && admin.roles.cache.has('r_vip'));
+  comprobar('el rol de admin vuelve', dev.ok && admin.roles.cache.has('r_admin'));
   comprobar('ya no queda nada pendiente', sanciones.sancionDe(GUILD, 'ADMIN') === null);
 
+  console.log('\n=== y si prefieres quitarle TODOS los roles ===');
+  store.getGuild(GUILD).config.quitarSoloRolesAdmin = false;
+  const admin2 = miembro('ADMIN2', { roles: ['r_admin', 'r_vip', 'r_color'] });
+  const res2 = await sanciones.castigar(admin2, 5000, 'prueba');
+  comprobar('se le quitan los 3', res2.ok && res2.roles.length === 3, JSON.stringify(res2.roles.map((r) => r.nombre)));
+  await sanciones.devolver(guildFalso, 'ADMIN2', 'prueba');
+  comprobar('y vuelven los 3', admin2.roles.cache.size === 3);
+  delete store.getGuild(GUILD).config.quitarSoloRolesAdmin;
+
   console.log('\n=== a quién NO se puede tocar ===');
-  const dueno = miembro(DUENO, { esAdmin: true, roles: ['r_admin'] });
+  const dueno = miembro(DUENO, { roles: ['r_admin'] });
   const r1 = await sanciones.castigar(dueno, 5000, 'prueba');
   comprobar('al dueño del servidor no', r1.ok === false, r1.motivo);
 
-  const jefe = miembro('JEFE', { esAdmin: true, roles: ['r_intocable'], porEncima: true });
+  const jefe = miembro('JEFE', { roles: ['r_intocable'], porEncima: true });
   const r2 = await sanciones.castigar(jefe, 5000, 'prueba');
   comprobar('a quien esté por encima del bot tampoco', r2.ok === false, r2.motivo);
   comprobar('y no le quitó ningún rol', jefe.roles.cache.has('r_intocable'));

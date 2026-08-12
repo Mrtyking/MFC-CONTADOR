@@ -29,12 +29,24 @@ function pendientes(guildId) {
   return g.sanciones;
 }
 
-/** Roles que el bot puede quitar y volver a poner (los que están por debajo del suyo). */
-function rolesQuitables(member) {
+/**
+ * Roles que el bot puede quitar y volver a poner.
+ *
+ * Por defecto solo toca los que dan permiso de Administrador, que son los
+ * únicos que hacen inmune al timeout. Los roles de color, VIP o decorativos
+ * se quedan donde están: quitarlos no aportaría nada.
+ *
+ * Con `quitarSoloRolesAdmin` en false se le quitan todos los que pueda.
+ */
+function rolesQuitables(member, soloAdmin = true) {
   const tope = member.guild.members.me.roles.highest.position;
-  return member.roles.cache.filter(
-    (r) => r.id !== member.guild.id && !r.managed && r.position < tope,
-  );
+  return member.roles.cache.filter((r) => {
+    if (r.id === member.guild.id) return false; // @everyone no se puede quitar
+    if (r.managed) return false; // roles de integraciones y de booster
+    if (r.position >= tope) return false; // por encima del bot: no lo puede tocar
+    if (soloAdmin && !r.permissions.has(PermissionFlagsBits.Administrator)) return false;
+    return true;
+  });
 }
 
 /** ¿Por qué no se puede castigar a este miembro? null si sí se puede. */
@@ -81,7 +93,8 @@ async function castigar(member, ms, razon) {
     };
   }
 
-  const quitables = rolesQuitables(member);
+  const soloAdmin = store.getConfig(member.guild.id).quitarSoloRolesAdmin !== false;
+  const quitables = rolesQuitables(member, soloAdmin);
   if (!quitables.size) {
     return { ok: false, metodo: null, motivo: 'es admin y no puedo quitarle ningún rol', roles: [] };
   }
@@ -104,6 +117,10 @@ async function castigar(member, ms, razon) {
 
   try {
     const fresco = await member.guild.members.fetch({ user: member.id, force: true });
+    if (fresco.permissions.has(PermissionFlagsBits.Administrator)) {
+      // Le quedó Administrador por otra vía (normalmente porque lo da @everyone)
+      throw new Error('sigue teniendo Administrador tras quitarle los roles');
+    }
     await fresco.timeout(ms, razon);
   } catch (err) {
     // Si el timeout falla, se le devuelven los roles en el acto: no se queda pelado

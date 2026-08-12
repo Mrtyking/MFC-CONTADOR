@@ -673,9 +673,12 @@ const handlers = {
             veredicto += `\nSu rol está en \`${suPos}\` y el mío en \`${miPos}\`. Necesito estar por encima de \`${suPos}\`.`;
           }
         } else if (esAdmin) {
-          const quitables = sanciones.rolesQuitables(member);
+          const soloAdmin = store.getConfig(guild.id).quitarSoloRolesAdmin !== false;
+          const quitables = sanciones.rolesQuitables(member, soloAdmin);
           veredicto = quitables.size
-            ? `✅ **Sí.** Es administrador, así que le quitaría ${quitables.size} rol(es), aplicaría el timeout y se los devolvería al terminar.`
+            ? `✅ **Sí.** Es administrador, así que le quitaría ${quitables.size} rol(es) — ${quitables
+                .map((r) => `\`${r.name}\``)
+                .join(', ')} — aplicaría el timeout y se los devolvería al terminar. El resto de sus roles no se tocan.`
             : '❌ Es administrador y no tengo ningún rol suyo que pueda quitar.';
         } else {
           veredicto = '✅ **Sí.** Timeout normal, sin tocarle los roles.';
