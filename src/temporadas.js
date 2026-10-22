@@ -169,7 +169,7 @@ function borrar(g) {
     u.mejorRacha = 0;
     u.totalTimeoutMs = 0;
   }
-  for (const c of [...Object.values(g.canales), ...Object.values(g.archivo ?? {})]) {
+  for (const c of Object.values(g.canales)) {
     store.historicoCanal(c);
     c.xp = 0;
     c.totalAciertos = 0;

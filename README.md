@@ -74,7 +74,7 @@ El bot solo funciona en el servidor `1155074712402149437`. Si está en cualquier
 | `/nivel [usuario]` | todos | Nivel del canal + estadísticas del usuario |
 | `/top [tipo]` | todos | Ranking de aciertos, mejor racha o fallos |
 | `/ayuda` | todos | Explica las reglas con los valores actuales |
-| `/setcanal [canal] [empezar_en]` | 🔒 | Define el canal del contador |
+| `/setcanal [canal] [empezar_en]` | 🔒 | Define el canal del contador. Solo hay uno: si lo pones en otro canal, se mueve ahí con su nivel, récord y estadísticas |
 | `/reiniciar [numero]` | 🔒 | Reinicia el conteo |
 | `/perdon <usuario> [borrar_infracciones]` | 🔒 | Quita el timeout, devuelve los roles retirados y (por defecto) borra las infracciones |
 | `/config ver \| poner \| reset` | 🔒 | Ajustes del servidor |

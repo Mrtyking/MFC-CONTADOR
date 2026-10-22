@@ -27,7 +27,7 @@ const efimero = (contenido) => ({ content: contenido, flags: MessageFlags.Epheme
 const definiciones = [
   new SlashCommandBuilder()
     .setName('setcanal')
-    .setDescription('Define el canal donde se lleva el contador')
+    .setDescription('Define el canal del contador (si ya había otro, se mueve a este)')
     .addChannelOption((o) =>
       o
         .setName('canal')
@@ -476,16 +476,11 @@ const handlers = {
     if (!enCanal?.has(PermissionFlagsBits.AddReactions)) faltan.push('Añadir reacciones');
     if (!enCanal?.has(PermissionFlagsBits.ReadMessageHistory)) faltan.push('Leer historial');
 
-    const g = store.getGuild(interaction.guild.id);
-    const nuevo = !g.canales[canalDiscord.id];
+    // Un solo canal por servidor: si estaba en otro, se mueve aquí con sus datos
+    const nuevo = !store.getCanal(interaction.guild.id, canalDiscord.id);
+    const anteriores = store.ponerCanalUnico(interaction.guild.id, canalDiscord.id);
 
-    // Si el canal estuvo activo antes, se recupera su nivel y su récord
-    if (nuevo && g.archivo?.[canalDiscord.id]) {
-      g.canales[canalDiscord.id] = g.archivo[canalDiscord.id];
-      delete g.archivo[canalDiscord.id];
-    }
-
-    const canal = store.getCanal(interaction.guild.id, canalDiscord.id, true);
+    const canal = store.getCanal(interaction.guild.id, canalDiscord.id);
     canal.actual = empezarEn;
     canal.ultimoUsuario = null;
     canal.ultimoMensajeId = null;
@@ -513,7 +508,10 @@ const handlers = {
     const panel = new Panel(COLOR_OK)
       .cabecera(nuevo ? 'Canal de conteo configurado' : 'Canal de conteo actualizado')
       .texto(
-        `${canalDiscord} queda como canal del contador.\nEmpieza en **${empezarEn}**, o sea que toca el **${empezarEn + 1}**.`,
+        `${canalDiscord} queda como canal del contador.\nEmpieza en **${empezarEn}**, o sea que toca el **${empezarEn + 1}**.` +
+          (anteriores.length
+            ? `\n\nYa no cuento en ${anteriores.map((id) => `<#${id}>`).join(', ')}: el nivel, el récord y las estadísticas pasan a este canal.`
+            : ''),
       );
     if (avisos.length) panel.separador().cita(avisos.join('\n'));
 

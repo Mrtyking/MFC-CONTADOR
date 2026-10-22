@@ -28,6 +28,50 @@ function cargar() {
     db = { guilds: {} };
   }
   if (!db.guilds) db.guilds = {};
+  limpiarCanalesDuplicados();
+}
+
+/**
+ * Solo puede haber un canal de conteo por servidor. Si quedaron varios (de
+ * cuando se podía tener más de uno, p. ej. canales de prueba), se queda el que
+ * más se ha usado, con todos sus datos, y se quitan los demás. Pasa una sola
+ * vez: después /setcanal no deja que vuelva a haber dos.
+ */
+function limpiarCanalesDuplicados() {
+  const uso = (c) => (c.historico?.aciertos ?? c.totalAciertos ?? 0) * 1e6 + (c.record ?? 0);
+  let cambios = false;
+  for (const [guildId, g] of Object.entries(db.guilds)) {
+    if (g.archivo) {
+      delete g.archivo; // canales desactivados de antes: ya no se usan
+      cambios = true;
+    }
+    const ids = Object.keys(g.canales ?? {});
+    if (ids.length > 1) {
+      const principal = ids.reduce((a, b) => (uso(g.canales[b]) > uso(g.canales[a]) ? b : a));
+      g.canales = { [principal]: g.canales[principal] };
+      cambios = true;
+      console.warn(
+        `[store] El servidor ${guildId} tenía ${ids.length} canales de conteo. Se queda ${principal} (el más usado) y se quitan ${ids
+          .filter((id) => id !== principal)
+          .join(', ')}.`,
+      );
+    }
+  }
+  if (cambios) guardarAhora();
+}
+
+/**
+ * Deja el contador solo en `canalId`. Si estaba en otro canal, el nuevo se
+ * queda con sus datos (nivel, récord, estadísticas) y el anterior se quita.
+ * Devuelve los IDs de los canales que se quitaron.
+ */
+function ponerCanalUnico(guildId, canalId) {
+  const g = getGuild(guildId);
+  const anteriores = Object.keys(g.canales).filter((id) => id !== canalId);
+  if (!g.canales[canalId] && anteriores.length) g.canales[canalId] = g.canales[anteriores[0]];
+  for (const id of anteriores) delete g.canales[id];
+  getCanal(guildId, canalId, true);
+  return anteriores;
 }
 
 function guardarAhora() {
@@ -148,6 +192,7 @@ module.exports = {
   getGuild,
   getConfig,
   getCanal,
+  ponerCanalUnico,
   getUsuario,
   historico,
   historicoCanal,

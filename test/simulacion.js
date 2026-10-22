@@ -501,6 +501,35 @@ async function enviar(userId, texto) {
   comprobar("el récord sobrevive", recargado.record === snapshot.record, `récord=${recargado.record}`);
   comprobar("la XP sobrevive", recargado.xp === snapshot.xp, `xp=${recargado.xp}`);
 
+  console.log('\n=== un solo canal de conteo ===');
+  // Como en el servidor real: el canal bueno (récord 369) y uno de prueba
+  const bueno = store2.getCanal(GUILD, CANAL);
+  bueno.record = 369;
+  bueno.historico = { aciertos: 400, fallos: 3 };
+  const prueba = store2.getCanal(GUILD, 'test', true);
+  prueba.record = 1;
+  store2.guardarAhora();
+  comprobar('hay dos canales guardados', Object.keys(store2.getGuild(GUILD).canales).length === 2);
+  delete require.cache[require.resolve('../src/store')];
+  const store3 = require('../src/store');
+  store3.cargar();
+  comprobar(
+    'al arrancar se queda solo el más usado',
+    Object.keys(store3.getGuild(GUILD).canales).join() === CANAL,
+    Object.keys(store3.getGuild(GUILD).canales).join(', '),
+  );
+  comprobar('y conserva su récord', store3.getCanal(GUILD, CANAL).record === 369);
+
+  store3.ponerCanalUnico(GUILD, 'cA');
+  const cA = store3.getCanal(GUILD, 'cA');
+  cA.xp = 77;
+  cA.record = 300;
+  const quitados = store3.ponerCanalUnico(GUILD, 'cB');
+  const canales = Object.keys(store3.getGuild(GUILD).canales);
+  comprobar('/setcanal en otro canal quita el anterior', canales.join() === 'cB' && quitados.join() === 'cA');
+  comprobar('y el nuevo se queda con sus datos', store3.getCanal(GUILD, 'cB').xp === 77 && store3.getCanal(GUILD, 'cB').record === 300);
+  comprobar('repetir en el mismo canal no rompe nada', store3.ponerCanalUnico(GUILD, 'cB').length === 0);
+
   console.log('\n=== permisos de comandos ===');
   const permisos = require('../src/permisos');
   const fingirInteraccion = (userId, rolesUsuario = []) => ({
