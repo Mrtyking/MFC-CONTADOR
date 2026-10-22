@@ -243,7 +243,7 @@ async function enviar(userId, texto) {
   r = await enviar('C', '4'); // tocaba el 3
   const min1 = (r.timeouts[0]?.ms ?? 0) / 60000;
   comprobar('C recibe timeout', r.timeouts.length === 1);
-  comprobar('~3-4 min de castigo', min1 >= 3 && min1 <= 5, `${min1} min`);
+  comprobar('castigo suave: 1 min', min1 === 1, `${min1} min`);
   comprobar('embed dice qué se esperaba', /se esperaba `3`/.test(r.embeds[0]?.desc ?? ''));
   comprobar('llegaron hasta 2', r.embeds[0]?.campos['Llegaron hasta'] === '`2`');
   comprobar(
@@ -266,6 +266,7 @@ async function enviar(userId, texto) {
 
   console.log('\n=== reincidencia (anti-spam) ===');
   const castigos = [];
+  store.getUsuario(GUILD, 'C').ultimaInfraccion = 0; // empieza sin infracciones
   for (let i = 0; i < 5; i++) {
     canal.actual = 0;
     canal.ultimoUsuario = null;
@@ -277,7 +278,13 @@ async function enviar(userId, texto) {
   console.log('   castigos seguidos (min):', castigos.join(' → '));
   comprobar('el castigo sube al reincidir', castigos[1] > castigos[0]);
   comprobar('sigue subiendo', castigos[2] > castigos[1]);
-  comprobar('respeta el tope ×16', castigos[4] <= castigos[0] * 16);
+  comprobar('respeta el tope ×4', castigos[4] === castigos[0] * 4, `${castigos[4]} min`);
+  const peor = calcularCastigo({
+    numeroArruinado: 100000,
+    usuario: { infracciones: 10, ultimaInfraccion: Date.now() },
+    cfg: store.getConfig(GUILD),
+  });
+  comprobar('nunca pasa de 1 hora', peor.minutos === 60, formatDuracion(peor.ms));
 
   console.log('\n=== la ventana anti-spam expira ===');
   const cfg2 = store.getConfig(GUILD);

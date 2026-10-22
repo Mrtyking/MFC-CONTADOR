@@ -22,14 +22,15 @@ const DEFAULTS = {
   // le quitan los que dan permiso de Administrador; los de color, VIP y demás
   // se quedan. En false se le quitan todos los que el bot alcance.
   quitarSoloRolesAdmin: true,
-  minutosPorNumero: 1, // minutos = número arruinado × este factor
-  timeoutMinimoMin: 3,
-  timeoutMaximoMin: 40320, // 28 días (máximo que permite Discord)
+  // Suave a propósito: un castigo largo quita las ganas de jugar.
+  minutosPorNumero: 0.1, // minutos = número arruinado × este factor (el 100 → 10 min)
+  timeoutMinimoMin: 1,
+  timeoutMaximoMin: 60, // tope de 1 hora (Discord deja hasta 28 días: 40320)
 
   // --- Anti-spam (reincidencia) ---
   multiplicadorSpam: 2, // cada infracción seguida multiplica el castigo por esto
-  maxMultiplicadorSpam: 16, // tope del multiplicador
-  ventanaSpamMin: 360, // 6 h sin arruinar = las infracciones se olvidan
+  maxMultiplicadorSpam: 4, // tope del multiplicador
+  ventanaSpamMin: 60, // 1 h sin arruinar = las infracciones se olvidan
 
   // --- Niveles ---
   xpPorAcierto: 1,

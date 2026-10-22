@@ -91,26 +91,26 @@ Los mensajes que no empiezan por un número se ignoran (`13 vamos!` sí cuenta c
 **Base — según el número arruinado:**
 
 ```
-minutos = número × minutosPorNumero   (mínimo 3, máximo 28 días)
+minutos = número × minutosPorNumero   (mínimo 1 minuto, máximo 1 hora)
 ```
 
-Con los valores por defecto (`minutosPorNumero = 1`):
+Los castigos son suaves a propósito: uno largo quita las ganas de jugar. Con los valores por defecto (`minutosPorNumero = 0.1`):
 
 | Número arruinado | Timeout |
 |---|---|
-| 4 | 4 minutos |
-| 13 | 13 minutos |
-| 50 | 50 minutos |
-| 285 | 4 h 45 min |
-| 1000 | 16 h 40 min |
+| 4 | 1 minuto |
+| 13 | 1 minuto |
+| 50 | 5 minutos |
+| 285 | 29 minutos |
+| 1000 o más | 1 hora (tope) |
 
-**Reincidencia (anti-spam):** si vuelves a romper la cadena **antes de 6 horas** desde tu última infracción, el castigo se multiplica ×2 cada vez, hasta un tope de ×16:
+**Reincidencia (anti-spam):** si vuelves a romper la cadena **antes de 1 hora** desde tu última infracción, el castigo se multiplica ×2 cada vez, hasta un tope de ×4 (y nunca más de 1 hora en total):
 
 ```
-1ª vez  ×1      2ª vez  ×2      3ª vez  ×4      4ª vez  ×8      5ª+ ×16
+1ª vez  ×1      2ª vez  ×2      3ª+ vez  ×4
 ```
 
-Si aguantas esas 6 horas sin romper nada, se te olvidan las infracciones y vuelves al castigo normal. Así el que la rompe una vez sin querer paga poco, y el que entra a hacer spam se va cada vez más tiempo.
+Si aguantas esa hora sin romper nada, se te olvidan las infracciones y vuelves al castigo normal. Así el que la rompe una vez sin querer paga poco, y el que entra a hacer spam se va cada vez más tiempo.
 
 ## Timeouts a administradores
 
@@ -222,12 +222,12 @@ La fórmula es `xpBase × (nivel+1) ^ xpExponente`. Sube `xpExponente` para hace
 | `avisarBorrados` | `true` | Avisar si borran/editan el último número |
 | `timeoutsActivos` | `true` | Aplicar timeouts |
 | `quitarSoloRolesAdmin` | `true` | Al castigar a un admin, quitarle solo los roles de admin |
-| `minutosPorNumero` | `1` | Minutos de castigo por cada número |
-| `timeoutMinimoMin` | `3` | Castigo mínimo |
-| `timeoutMaximoMin` | `40320` | Castigo máximo (28 días, tope de Discord) |
+| `minutosPorNumero` | `0.1` | Minutos de castigo por cada número |
+| `timeoutMinimoMin` | `1` | Castigo mínimo |
+| `timeoutMaximoMin` | `60` | Castigo máximo (Discord deja hasta 40320 = 28 días) |
 | `multiplicadorSpam` | `2` | Cuánto se multiplica al reincidir |
-| `maxMultiplicadorSpam` | `16` | Tope del multiplicador |
-| `ventanaSpamMin` | `360` | Minutos sin fallar para que se olviden las infracciones |
+| `maxMultiplicadorSpam` | `4` | Tope del multiplicador |
+| `ventanaSpamMin` | `60` | Minutos sin fallar para que se olviden las infracciones |
 | `xpPorAcierto` | `1` | XP por número correcto |
 | `xpBase` | `20` | Coste base de nivel |
 | `xpExponente` | `1.25` | Cuánto se encarece cada nivel |
@@ -239,7 +239,7 @@ La fórmula es `xpBase × (nivel+1) ^ xpExponente`. Sube `xpExponente` para hace
 Ejemplos:
 
 ```
-/config poner ajuste:minutosPorNumero valor:2
+/config poner ajuste:minutosPorNumero valor:0.05
 /config poner ajuste:permitirRepetir valor:true
 /config poner ajuste:xpExponente valor:1.5
 /config poner ajuste:banner valor:https://.../banner.gif
