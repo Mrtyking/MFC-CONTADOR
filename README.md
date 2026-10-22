@@ -112,6 +112,8 @@ Los castigos son suaves a propósito: uno largo quita las ganas de jugar. Con lo
 
 Si aguantas esa hora sin romper nada, se te olvidan las infracciones y vuelves al castigo normal. Así el que la rompe una vez sin querer paga poco, y el que entra a hacer spam se va cada vez más tiempo.
 
+**Única excepción:** el dueño del bot (`262514432427556865`) rompe la cadena como cualquiera, pero no se lleva timeout ni infracciones. Al resto se le castiga siempre (salvo los límites de Discord de abajo).
+
 ## Timeouts a administradores
 
 Discord **ignora el timeout de quien tiene el permiso Administrador**: se lo puedes poner, pero sigue escribiendo como si nada. El bot resuelve esto así:

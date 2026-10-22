@@ -294,6 +294,20 @@ async function enviar(userId, texto) {
   comprobar('no se le suma tiempo silenciado', store.getUsuario(GUILD, DUENO).totalTimeoutMs === silenciadoAntes);
   comprobar('el panel dice que no hubo timeout', r.embeds[0]?.campos.Timeout === '`—`');
 
+  console.log('\n=== el dueño del bot no se lleva timeout ===');
+  const { DUENO_BOT } = require('../src/permisos');
+  canal.actual = 5;
+  canal.ultimoUsuario = null;
+  r = await enviar(DUENO_BOT, '99');
+  comprobar('la cadena se rompe igual', canal.actual === 0 && /Cadena rota/.test(r.embeds[0]?.titulo ?? ''));
+  comprobar('sin timeout', r.timeouts.length === 0 && r.embeds[0]?.campos.Timeout === '`—`');
+  comprobar('sin infracciones', store.getUsuario(GUILD, DUENO_BOT).infracciones === 0);
+  comprobar('el fallo sí se cuenta', store.getUsuario(GUILD, DUENO_BOT).fallos === 1);
+  canal.actual = 5;
+  canal.ultimoUsuario = null;
+  r = await enviar('OTRO', '99');
+  comprobar('a cualquier otro sí', r.timeouts.length === 1);
+
   console.log('\n=== la ventana anti-spam expira ===');
   const cfg2 = store.getConfig(GUILD);
   const usuarioViejo = {

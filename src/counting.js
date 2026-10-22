@@ -7,6 +7,7 @@ const sanciones = require('./sanciones');
 const { calcularCastigo } = require('./timeouts');
 const { parseNumero, formatDuracion, resolverEmoji } = require('./utils');
 const { Panel, boton, aviso } = require('./ui');
+const { DUENO_BOT } = require('./permisos');
 
 const COLOR_OK = 0x57f287;
 const COLOR_FAIL = 0xed4245;
@@ -103,6 +104,11 @@ async function manejarMensaje(message) {
   }
 
   // --- Cadena rota ---
+  // El dueño del bot rompe la cadena como cualquiera, pero sin timeout ni
+  // infracciones. Al resto se le castiga siempre.
+  const exento = message.author.id === DUENO_BOT;
+  const castigable = cfg.timeoutsActivos && !exento;
+
   const llegoHasta = canal.actual;
   const castigo = calcularCastigo({
     numeroArruinado: esperado,
@@ -112,8 +118,10 @@ async function manejarMensaje(message) {
 
   usuario.fallos++;
   usuario.rachaActual = 0;
-  usuario.infracciones = castigo.infracciones;
-  usuario.ultimaInfraccion = Date.now();
+  if (!exento) {
+    usuario.infracciones = castigo.infracciones;
+    usuario.ultimaInfraccion = Date.now();
+  }
   historico.fallos++;
 
   canal.actual = 0;
@@ -127,8 +135,8 @@ async function manejarMensaje(message) {
   const reaccion = reaccionar(message, message.client, cfg.emojiFail, '❌');
 
   // Timeout (si es admin, sanciones se encarga de quitarle los roles primero)
-  let resultado = { ok: false, motivo: 'los timeouts están desactivados', metodo: null, roles: [] };
-  if (cfg.timeoutsActivos) {
+  let resultado = { ok: false, motivo: 'sin timeout', metodo: null, roles: [] };
+  if (castigable) {
     if (!message.guild.members.me?.permissions.has(PermissionFlagsBits.ModerateMembers)) {
       resultado = { ok: false, motivo: 'me falta el permiso Aislar miembros', metodo: null, roles: [] };
     } else {
@@ -154,7 +162,7 @@ async function manejarMensaje(message) {
 
   // Lo técnico va a la consola, no al canal: el embed es para los usuarios y
   // solo tiene que decir que la cadena se rompió y cuánto dura el castigo.
-  if (cfg.timeoutsActivos && !resultado.ok) {
+  if (castigable && !resultado.ok) {
     console.warn(
       `[timeout] No se pudo castigar a ${message.author.username} en ${message.guild.name}: ${resultado.motivo}`,
     );
@@ -182,9 +190,11 @@ async function manejarMensaje(message) {
       ['Timeout', resultado.ok ? `\`${formatDuracion(castigo.ms)}\`` : '`—`'],
       [
         'Infracciones',
-        castigo.multiplicador > 1
-          ? `\`${castigo.infracciones}\` · castigo \`×${castigo.multiplicador}\``
-          : `\`${castigo.infracciones}\``,
+        exento
+          ? `\`${usuario.infracciones ?? 0}\``
+          : castigo.multiplicador > 1
+            ? `\`${castigo.infracciones}\` · castigo \`×${castigo.multiplicador}\``
+            : `\`${castigo.infracciones}\``,
       ],
       ['Nivel', `\`[${info.barra}] ${info.actual} / ${info.necesario}\``],
     ])
