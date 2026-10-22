@@ -155,7 +155,7 @@ function leerPanel(payload) {
   const titulo = lineas.find((l) => l.startsWith('### '))?.slice(4);
   const campos = {};
   for (const l of lineas) {
-    const m = /^\S+ \*\*(.+?):\*\* (.+)$/.exec(l);
+    const m = /^\*\*(.+?):\*\* (.+)$/.exec(l);
     if (m) campos[m[1]] = m[2];
   }
   return {
@@ -198,6 +198,8 @@ async function enviar(userId, texto) {
   comprobar('0/10 vacía', barra(0, 10) === '▱▱▱▱▱▱▱▱▱▱', barra(0, 10));
   comprobar('3/10 -> 3 llenos', barra(3, 10) === '▰▰▰▱▱▱▱▱▱▱', barra(3, 10));
   comprobar('10/10 llena', barra(10, 10) === '▰▰▰▰▰▰▰▰▰▰', barra(10, 10));
+  comprobar('1/20 ya se nota', barra(1, 20) === '▰▱▱▱▱▱▱▱▱▱', barra(1, 20));
+  comprobar('19/20 no se ve llena', barra(19, 20) === '▰▰▰▰▰▰▰▰▰▱', barra(19, 20));
 
   console.log('\n=== curva de niveles ===');
   const cfg = store.getConfig(GUILD);

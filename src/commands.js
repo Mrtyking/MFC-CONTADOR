@@ -186,16 +186,16 @@ const definiciones = [
 const PIE = '© MFC Contador';
 
 const TOPS = {
-  aciertos: { label: 'Aciertos', emoji: '✅' },
-  mejorRacha: { label: 'Mejor racha', emoji: '🔥' },
-  fallos: { label: 'Fallos', emoji: '💥' },
+  aciertos: { label: 'Aciertos' },
+  mejorRacha: { label: 'Mejor racha' },
+  fallos: { label: 'Fallos' },
 };
 
 /** Botones que van debajo de los paneles públicos. */
 const botonesConsulta = () => [
-  boton('mfc:nivel', 'Mi nivel', '📊'),
-  boton('mfc:top', 'Top', '🏆'),
-  boton('mfc:ayuda', 'Ayuda', '❓'),
+  boton('mfc:nivel', 'Mi nivel'),
+  boton('mfc:top', 'Top'),
+  boton('mfc:ayuda', 'Ayuda'),
 ];
 
 function panelContador(guildId, canalId, client) {
@@ -206,23 +206,23 @@ function panelContador(guildId, canalId, client) {
   const info = levels.calcular(canal.xp, cfg);
   return new Panel(COLOR_OK)
     .banner(cfg.banner)
-    .cabecera('🔢 Contador', {
+    .cabecera('Contador', {
       subtitulo: `Toca el **${canal.actual + 1}**`,
       imagen: client.user?.displayAvatarURL({ size: 128 }),
     })
     .separador()
     .campos([
-      ['📍', 'Actual', `\`${canal.actual}\``],
-      ['🏆', 'Récord', `\`${canal.record}\``],
-      ['👤', 'Último', canal.ultimoUsuario ? `<@${canal.ultimoUsuario}>` : '`—`'],
-      ['✅', 'Aciertos', `\`${canal.totalAciertos}\``],
-      ['💥', 'Cadenas rotas', `\`${canal.totalFallos}\``],
+      ['Actual', `\`${canal.actual}\``],
+      ['Récord', `\`${canal.record}\``],
+      ['Último', canal.ultimoUsuario ? `<@${canal.ultimoUsuario}>` : '`—`'],
+      ['Aciertos', `\`${canal.totalAciertos}\``],
+      ['Cadenas rotas', `\`${canal.totalFallos}\``],
     ])
     .separador()
     .cita(
-      `⭐ **Nivel ${info.nivel}**\n\`[${info.barra}] ${info.xp} / ${info.siguiente}\` · faltan \`${info.faltan}\``,
+      `**Nivel ${info.nivel}**\n\`[${info.barra}] ${info.xp} / ${info.siguiente}\` · faltan \`${info.faltan}\``,
     )
-    .botones(boton('mfc:contador:actualizar', 'Actualizar', '🔄'), ...botonesConsulta())
+    .botones(boton('mfc:contador:actualizar', 'Actualizar'), ...botonesConsulta())
     .pie(`${PIE} · Actualizado ${tsRelativo(Date.now())}`);
 }
 
@@ -232,14 +232,14 @@ function panelNivel(guildId, canalId, objetivo) {
   const u = g.usuarios[objetivo.id];
   const canal = store.getCanal(guildId, canalId) ?? g.canales[Object.keys(g.canales)[0]];
 
-  const panel = new Panel(COLOR_INFO).cabecera(`📊 ${objetivo.username}`, {
+  const panel = new Panel(COLOR_INFO).cabecera(objetivo.username, {
     subtitulo: `Estadísticas de <@${objetivo.id}>`,
     imagen: objetivo.displayAvatarURL({ size: 128 }),
   });
 
   if (canal) {
     const info = levels.calcular(canal.xp, cfg);
-    panel.cita(`⭐ **Nivel del canal — ${info.nivel}**\n\`[${info.barra}] ${info.xp} / ${info.siguiente}\``);
+    panel.cita(`**Nivel del canal — ${info.nivel}**\n\`[${info.barra}] ${info.xp} / ${info.siguiente}\``);
   }
 
   panel.separador();
@@ -251,22 +251,21 @@ function panelNivel(guildId, canalId, objetivo) {
     u.ultimaInfraccion && Date.now() - u.ultimaInfraccion <= ventanaMs ? u.infracciones : 0;
 
   panel.campos([
-    ['✅', 'Aciertos', `\`${u.aciertos}\``],
-    ['💥', 'Fallos', `\`${u.fallos}\``],
-    ['🔥', 'Mejor racha', `\`${u.mejorRacha}\``],
-    ['📈', 'Racha actual', `\`${u.rachaActual}\``],
+    ['Aciertos', `\`${u.aciertos}\``],
+    ['Fallos', `\`${u.fallos}\``],
+    ['Mejor racha', `\`${u.mejorRacha}\``],
+    ['Racha actual', `\`${u.rachaActual}\``],
     [
-      '⚠️',
       'Infracciones activas',
       infraccionesVivas ? `\`${infraccionesVivas}\` · última ${tsRelativo(u.ultimaInfraccion)}` : '`0`',
     ],
-    ['🔇', 'Tiempo silenciado', `\`${formatDuracion(u.totalTimeoutMs)}\``],
+    ['Tiempo silenciado', `\`${formatDuracion(u.totalTimeoutMs)}\``],
   ]);
 
   const sancion = sanciones.sancionDe(guildId, objetivo.id);
   if (sancion) {
     panel.separador().cita(
-      `🛡️ **Roles retirados (${sancion.roles.length})** · se le devuelven <t:${Math.floor(sancion.hasta / 1000)}:R>\n${(sancion.nombres ?? [])
+      `**Roles retirados (${sancion.roles.length})** · se le devuelven <t:${Math.floor(sancion.hasta / 1000)}:R>\n${(sancion.nombres ?? [])
         .slice(0, 10)
         .map((n) => `\`${n}\``)
         .join(', ')}`,
@@ -284,15 +283,14 @@ function panelTop(guildId, tipo) {
     .sort((a, b) => b.valor - a.valor)
     .slice(0, 10);
 
-  const medallas = ['🥇', '🥈', '🥉'];
   const texto = lista.length
     ? lista
-        .map((x, i) => `${medallas[i] ?? `\`${String(i + 1).padStart(2, ' ')}.\``} <@${x.id}> — **${x.valor}**`)
+        .map((x, i) => `\`${String(i + 1).padStart(2, ' ')}.\` <@${x.id}> — **${x.valor}**`)
         .join('\n')
     : 'Todavía no hay datos para este ranking.';
 
   return new Panel(COLOR_INFO)
-    .cabecera(`🏆 Top ${TOPS[tipo].label}`)
+    .cabecera(`Top ${TOPS[tipo].label}`)
     .cita('Los 10 mejores del servidor. Cambia de ranking en el menú.')
     .separador()
     .texto(texto)
@@ -301,7 +299,7 @@ function panelTop(guildId, tipo) {
       desplegable(
         'mfc:top:menu',
         'Elige un ranking',
-        Object.entries(TOPS).map(([value, t]) => ({ value, label: t.label, emoji: t.emoji })),
+        Object.entries(TOPS).map(([value, t]) => ({ value, label: t.label })),
         tipo,
       ),
     )
@@ -310,12 +308,12 @@ function panelTop(guildId, tipo) {
 
 /** Secciones de /ayuda. Cada una sale con su botón y en el menú. */
 const AYUDA = {
-  inicio: { label: 'Inicio', emoji: '📖', resumen: 'Cómo se juega' },
-  timeouts: { label: 'Timeouts', emoji: '⏱️', resumen: 'Cuánto dura el castigo según el número' },
-  reincidencia: { label: 'Reincidencia', emoji: '🔁', resumen: 'Qué pasa si la rompes otra vez' },
-  niveles: { label: 'Niveles', emoji: '⭐', resumen: 'Cómo sube de nivel el canal' },
-  admins: { label: 'Admins', emoji: '🛡️', resumen: 'Por qué los admins tampoco se salvan' },
-  comandos: { label: 'Comandos', emoji: '⌨️', resumen: 'Todo lo que puedes usar' },
+  inicio: { label: 'Inicio', resumen: 'Cómo se juega' },
+  timeouts: { label: 'Timeouts', resumen: 'Cuánto dura el castigo según el número' },
+  reincidencia: { label: 'Reincidencia', resumen: 'Qué pasa si la rompes otra vez' },
+  niveles: { label: 'Niveles', resumen: 'Cómo sube de nivel el canal' },
+  admins: { label: 'Admins', resumen: 'Por qué los admins tampoco se salvan' },
+  comandos: { label: 'Comandos', resumen: 'Todo lo que puedes usar' },
 };
 
 function contenidoAyuda(guildId, seccion) {
@@ -338,8 +336,8 @@ function contenidoAyuda(guildId, seccion) {
       return 'No. Discord ignora el timeout de los administradores, así que el bot les quita los roles primero, aplica el castigo y **se los devuelve solo** cuando termina.\n\nAl dueño del servidor no se le puede tocar (eso es límite de Discord).';
     case 'comandos':
       return `${Object.keys(permisos.NIVELES)
-        .map((cmd) => `\`/${cmd}\`${permisos.nivelDe(guildId, cmd) === permisos.ADMIN ? ' 🔒' : ''}`)
-        .join('  ')}\n\n-# 🔒 = solo para los roles con permiso`;
+        .map((cmd) => `\`/${cmd}\`${permisos.nivelDe(guildId, cmd) === permisos.ADMIN ? '*' : ''}`)
+        .join('  ')}\n\n-# * = solo para los roles con permiso`;
     default:
       return null;
   }
@@ -353,7 +351,7 @@ function panelAyuda(guildId, seccion = 'inicio') {
   if (actual === 'inicio') {
     panel
       .banner(cfg.banner)
-      .cabecera('📖 Cómo funciona el contador')
+      .cabecera('Cómo funciona el contador')
       .cita('Elige una sección abajo para ver los detalles.')
       .separador()
       .texto(
@@ -368,13 +366,13 @@ function panelAyuda(guildId, seccion = 'inicio') {
       .cita(
         Object.entries(AYUDA)
           .filter(([k]) => k !== 'inicio')
-          .map(([, s]) => `${s.emoji} **${s.label}:** ${s.resumen}.`)
+          .map(([, s]) => `**${s.label}:** ${s.resumen}.`)
           .join('\n'),
       );
   } else {
     const s = AYUDA[actual];
     panel
-      .cabecera(`${s.emoji} ${s.label}`)
+      .cabecera(s.label)
       .cita(`${s.resumen}.`)
       .separador()
       .texto(contenidoAyuda(guildId, actual));
@@ -385,7 +383,7 @@ function panelAyuda(guildId, seccion = 'inicio') {
       Object.entries(AYUDA)
         .filter(([k]) => k !== 'inicio')
         .slice(0, 5)
-        .map(([k, s]) => boton(`mfc:ayuda:${k}`, s.label, s.emoji, k === actual)),
+        .map(([k, s]) => boton(`mfc:ayuda:${k}`, s.label, null, k === actual)),
     )
     .menu(
       desplegable(
@@ -395,7 +393,6 @@ function panelAyuda(guildId, seccion = 'inicio') {
           value,
           label: s.label,
           description: s.resumen,
-          emoji: s.emoji,
         })),
         actual,
       ),
@@ -461,7 +458,7 @@ async function levantarCastigo(interaction, { borrarInfracciones }) {
   const fallo = lineas.some((l) => l.includes('No pude'));
   await interaction.reply(
     new Panel(fallo ? COLOR_FAIL : COLOR_OK)
-      .cabecera(borrarInfracciones ? '🕊️ Perdonado' : '🔓 Timeout retirado', {
+      .cabecera(borrarInfracciones ? 'Perdonado' : 'Timeout retirado', {
         subtitulo: `<@${objetivo.id}>`,
         imagen: objetivo.displayAvatarURL({ size: 128 }),
       })
@@ -502,20 +499,20 @@ const handlers = {
     store.guardar();
 
     const avisos = [];
-    if (faltan.length) avisos.push(`⚠️ Me faltan permisos ahí: **${faltan.join(', ')}**`);
+    if (faltan.length) avisos.push(`Me faltan permisos ahí: **${faltan.join(', ')}**`);
     if (!resolverEmoji(interaction.client, cfg.emojiOk)) {
       avisos.push(
-        `⚠️ No encuentro el emoji \`${cfg.emojiOk}\`. Tengo que estar en el servidor donde vive ese emoji; mientras tanto reaccionaré con ✅.`,
+        `No encuentro el emoji \`${cfg.emojiOk}\`. Tengo que estar en el servidor donde vive ese emoji; mientras tanto reaccionaré con ✅.`,
       );
     }
     if (!interaction.guild.members.me.permissions.has(PermissionFlagsBits.ModerateMembers)) {
       avisos.push(
-        '⚠️ **Sin permiso para timeouts.** Dame el permiso **Aislar miembros** (Moderate Members) o no podré castigar a quien rompa la cadena.',
+        '**Sin permiso para timeouts.** Dame el permiso **Aislar miembros** (Moderate Members) o no podré castigar a quien rompa la cadena.',
       );
     }
 
     const panel = new Panel(COLOR_OK)
-      .cabecera(nuevo ? '✅ Canal de conteo configurado' : '✅ Canal de conteo actualizado')
+      .cabecera(nuevo ? 'Canal de conteo configurado' : 'Canal de conteo actualizado')
       .texto(
         `${canalDiscord} queda como canal del contador.\nEmpieza en **${empezarEn}**, o sea que toca el **${empezarEn + 1}**.`,
       );
@@ -547,7 +544,7 @@ const handlers = {
     await interaction.reply(
       aviso(
         COLOR_INFO,
-        '🛑 Canal quitado',
+        'Canal quitado',
         `Ya no llevo el contador en ${canalDiscord}.` +
           (borrar ? ' Datos borrados.' : ' Guardé el nivel y el récord por si lo reactivas.'),
       ).mensaje(),
@@ -592,7 +589,7 @@ const handlers = {
     store.guardar();
 
     await interaction.reply(
-      aviso(COLOR_INFO, '♻️ Contador reiniciado', `Ahora va el **${numero + 1}**.`).mensaje(),
+      aviso(COLOR_INFO, 'Contador reiniciado', `Ahora va el **${numero + 1}**.`).mensaje(),
     );
   },
 
@@ -623,7 +620,7 @@ const handlers = {
     await interaction.reply(
       aviso(
         r.ok ? COLOR_OK : COLOR_FAIL,
-        r.ok ? '🛡️ Roles devueltos' : '❌ No pude devolver los roles',
+        r.ok ? 'Roles devueltos' : 'No pude devolver los roles',
         r.ok
           ? `Roles devueltos a <@${objetivo.id}>: ${(sancion.nombres ?? [])
               .map((n) => `\`${n}\``)
@@ -645,16 +642,16 @@ const handlers = {
 
       return interaction.reply(
         new Panel(COLOR_INFO)
-          .cabecera('🔐 Permisos')
+          .cabecera('Permisos')
           .cita('Quién puede usar cada comando del bot.')
           .separador()
           .texto(
-            `**🛡️ Roles con permiso de administración**\n${roles.length ? roles.map((id) => `<@&${id}>`).join('\n') : '— (ninguno)'}`,
+            `**Roles con permiso de administración**\n${roles.length ? roles.map((id) => `<@&${id}>`).join('\n') : '— (ninguno)'}`,
           )
-          .texto(`**👑 Dueño del bot (siempre puede)**\n<@${permisos.DUENO_BOT}>`)
+          .texto(`**Dueño del bot (siempre puede)**\n<@${permisos.DUENO_BOT}>`)
           .separador()
-          .texto(`**🌐 Comandos públicos**\n${porNivel.publico.join(' ') || '—'}`)
-          .texto(`**🔒 Comandos administrativos**\n${porNivel.admin.join(' ') || '—'}`)
+          .texto(`**Comandos públicos**\n${porNivel.publico.join(' ') || '—'}`)
+          .texto(`**Comandos administrativos**\n${porNivel.admin.join(' ') || '—'}`)
           .pie('Cámbialo con /permisos rol y /permisos comando')
           .mensaje({ efimero: true }),
       );
@@ -680,7 +677,7 @@ const handlers = {
       return interaction.reply(
         aviso(
           COLOR_OK,
-          '🔐 Permisos actualizados',
+          'Permisos actualizados',
           accion === 'añadir'
             ? `${rol} ya puede usar los comandos administrativos.`
             : `${rol} ya no puede usar los comandos administrativos.`,
@@ -695,7 +692,7 @@ const handlers = {
     await interaction.reply(
       aviso(
         COLOR_OK,
-        '🔐 Permisos actualizados',
+        'Permisos actualizados',
         nivel === 'publico'
           ? `\`/${cmd}\` ahora lo puede usar cualquiera.`
           : `\`/${cmd}\` ahora es solo para los roles con permiso.`,
@@ -716,11 +713,11 @@ const handlers = {
       const canales = Object.keys(g.canales);
       return interaction.reply(
         new Panel(COLOR_INFO)
-          .cabecera('⚙️ Configuración')
+          .cabecera('Configuración')
           .texto(`\`\`\`\n${lineas.join('\n')}\n\`\`\``)
           .pie('• = cambiado por ti')
           .separador()
-          .texto(`**📍 Canales de conteo**\n${canales.length ? canales.map((id) => `<#${id}>`).join(', ') : '—'}`)
+          .texto(`**Canales de conteo**\n${canales.length ? canales.map((id) => `<#${id}>`).join(', ') : '—'}`)
           .mensaje({ efimero: true }),
       );
     }
@@ -781,9 +778,9 @@ const handlers = {
     const yo = guild.members.me;
     const miPos = yo.roles.highest.position;
 
-    const check = (b) => (b ? '✅' : '❌');
+    const check = (b) => (b ? '`Sí`' : '`No`');
     const panel = new Panel(COLOR_INFO)
-      .cabecera('🩺 Revisión del bot', { imagen: interaction.client.user.displayAvatarURL({ size: 128 }) })
+      .cabecera('Revisión del bot',{ imagen: interaction.client.user.displayAvatarURL({ size: 128 }) })
       .separador()
       .texto(
         [
@@ -800,8 +797,8 @@ const handlers = {
     panel.separador().texto(
       `**Jerarquía**\nMi rol está en la posición \`${miPos}\`.\n` +
         (porEncima.size
-          ? `❌ Hay **${porEncima.size} roles por encima del mío**. A quien tenga uno de esos no puedo tocarlo, ni siendo admin.\n\n**Arrastra mi rol arriba del todo** en Ajustes del servidor → Roles.`
-          : '✅ Mi rol está por encima de todos. Puedo castigar a cualquiera menos al dueño.'),
+          ? `Hay **${porEncima.size} roles por encima del mío**. A quien tenga uno de esos no puedo tocarlo, ni siendo admin.\n\n**Arrastra mi rol arriba del todo** en Ajustes del servidor → Roles.`
+          : 'Mi rol está por encima de todos. Puedo castigar a cualquiera menos al dueño.'),
     );
 
     const objetivo = interaction.options.getUser('usuario');
@@ -809,14 +806,14 @@ const handlers = {
       const member = await guild.members.fetch(objetivo.id).catch(() => null);
       let veredicto;
       if (!member) {
-        veredicto = '❌ No está en el servidor.';
+        veredicto = '**No.** No está en el servidor.';
       } else {
         const impedimento = sanciones.bloqueo(member);
         const esAdmin = member.permissions.has(PermissionFlagsBits.Administrator);
         const suPos = member.roles.highest.position;
 
         if (impedimento) {
-          veredicto = `❌ **No.** ${impedimento[0].toUpperCase()}${impedimento.slice(1)}.`;
+          veredicto = `**No.** ${impedimento[0].toUpperCase()}${impedimento.slice(1)}.`;
           if (impedimento.includes('por encima')) {
             veredicto += `\nSu rol está en \`${suPos}\` y el mío en \`${miPos}\`. Necesito estar por encima de \`${suPos}\`.`;
           }
@@ -824,12 +821,12 @@ const handlers = {
           const soloAdmin = store.getConfig(guild.id).quitarSoloRolesAdmin !== false;
           const quitables = sanciones.rolesQuitables(member, soloAdmin);
           veredicto = quitables.size
-            ? `✅ **Sí.** Es administrador, así que le quitaría ${quitables.size} rol(es) — ${quitables
+            ? `**Sí.** Es administrador, así que le quitaría ${quitables.size} rol(es) — ${quitables
                 .map((r) => `\`${r.name}\``)
                 .join(', ')} — aplicaría el timeout y se los devolvería al terminar. El resto de sus roles no se tocan.`
-            : '❌ Es administrador y no tengo ningún rol suyo que pueda quitar.';
+            : '**No.** Es administrador y no tengo ningún rol suyo que pueda quitar.';
         } else {
-          veredicto = '✅ **Sí.** Timeout normal, sin tocarle los roles.';
+          veredicto = '**Sí.** Timeout normal, sin tocarle los roles.';
         }
       }
       panel.separador().cita(`**¿Puedo castigar a ${objetivo.username}?**\n${veredicto}`);

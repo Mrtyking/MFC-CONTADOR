@@ -68,12 +68,12 @@ class Panel {
     );
   }
 
-  /** Lista de [icono, nombre, valor] → "icono **Nombre:** valor" */
+  /** Lista de [nombre, valor] → "**Nombre:** valor" */
   campos(lista) {
     return this.texto(
       lista
         .filter(Boolean)
-        .map(([icono, nombre, valor]) => `${icono} **${nombre}:** ${valor}`)
+        .map(([nombre, valor]) => `**${nombre}:** ${valor}`)
         .join('\n'),
     );
   }

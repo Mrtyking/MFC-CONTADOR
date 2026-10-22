@@ -248,12 +248,12 @@ Ejemplos:
 
 ### Mensajes (Components V2)
 
-Todos los mensajes del bot usan **Components V2**, el sistema nuevo de Discord: un contenedor con la barra de color, títulos con icono, citas con la barra gris, separadores y los **botones y menús dentro del propio mensaje**. Hace falta discord.js 14.19 o superior.
+Todos los mensajes del bot usan **Components V2**, el sistema nuevo de Discord: un contenedor con la barra de color, títulos, citas con la barra gris, separadores y los **botones y menús dentro del propio mensaje**. Hace falta discord.js 14.19 o superior.
 
-- `/contador`: botones 🔄 Actualizar, 📊 Mi nivel, 🏆 Top y ❓ Ayuda.
+- `/contador`: botones Actualizar, Mi nivel, Top y Ayuda.
 - `/top`: menú para cambiar de ranking.
 - `/ayuda`: botones por sección y menú desplegable.
-- Cadena rota: botones 📊 Mi nivel y 🏆 Top.
+- Cadena rota: botones Mi nivel y Top.
 
 Los botones piden el mismo permiso que su comando. Lo que abren desde un mensaje público sale como mensaje efímero, para no llenar el canal.
 

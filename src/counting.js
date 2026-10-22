@@ -85,7 +85,7 @@ async function manejarMensaje(message) {
     if (nivelNuevo) {
       const info = levels.calcular(canal.xp, cfg);
       const panel = new Panel(COLOR_OK)
-        .cabecera('⭐ ¡Nivel alcanzado!', { subtitulo: `El canal subió al **nivel ${nivelNuevo}**.` })
+        .cabecera('¡Nivel alcanzado!', { subtitulo: `El canal subió al **nivel ${nivelNuevo}**.` })
         .separador()
         .cita(`\`[${info.barra}] ${info.xp} / ${info.siguiente}\``);
       try {
@@ -151,7 +151,7 @@ async function manejarMensaje(message) {
 
   const info = levels.calcular(canal.xp, cfg);
   const panel = new Panel(COLOR_FAIL)
-    .cabecera('💥 Cadena rota', {
+    .cabecera('Cadena rota', {
       subtitulo:
         motivo === MOTIVO.TURNO
           ? `**${message.author.username}** envió \`${numero}\` — **no puedes contar dos veces seguidas**`
@@ -160,20 +160,19 @@ async function manejarMensaje(message) {
     })
     .separador()
     .campos([
-      ['📍', 'Llegaron hasta', `\`${llegoHasta}\``],
-      ['🏆', 'Récord', `\`${canal.record}\``],
-      ['⏱️', 'Timeout', resultado.ok ? `\`${formatDuracion(castigo.ms)}\`` : '`—`'],
+      ['Llegaron hasta', `\`${llegoHasta}\``],
+      ['Récord', `\`${canal.record}\``],
+      ['Timeout', resultado.ok ? `\`${formatDuracion(castigo.ms)}\`` : '`—`'],
       [
-        '⚠️',
         'Infracciones',
         castigo.multiplicador > 1
           ? `\`${castigo.infracciones}\` · castigo \`×${castigo.multiplicador}\``
           : `\`${castigo.infracciones}\``,
       ],
-      ['⭐', 'Nivel', `\`[${info.barra}] ${info.xp} / ${info.siguiente}\``],
+      ['Nivel', `\`[${info.barra}] ${info.xp} / ${info.siguiente}\``],
     ])
     .separador()
-    .botones(boton('mfc:nivel', 'Mi nivel', '📊'), boton('mfc:top', 'Top', '🏆'))
+    .botones(boton('mfc:nivel', 'Mi nivel'), boton('mfc:top', 'Top'))
     .pie(`El contador vuelve a 1 · Respeta el turno · <t:${Math.floor(Date.now() / 1000)}:t>`);
 
   try {
@@ -192,7 +191,7 @@ async function manejarBorrado(message) {
 
   const panel = aviso(
     COLOR_INFO,
-    '🗑️ Número borrado',
+    'Número borrado',
     `<@${message.author.id}> borró su mensaje. El último número sigue siendo **${canal.actual}**, va el **${canal.actual + 1}**.`,
   );
   try {
@@ -214,7 +213,7 @@ async function manejarEdicion(_antes, despues) {
 
   const panel = aviso(
     COLOR_INFO,
-    '✏️ Número editado',
+    'Número editado',
     `<@${despues.author.id}> editó su número. No cuenta: el contador sigue en **${canal.actual}**, va el **${canal.actual + 1}**.`,
   );
   try {

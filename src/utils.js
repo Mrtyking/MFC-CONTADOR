@@ -12,10 +12,17 @@ function parseNumero(contenido) {
   return Number.isSafeInteger(n) ? n : null;
 }
 
-/** Barra de progreso: ▰▰▰▱▱▱▱▱▱▱ */
+/**
+ * Barra de progreso: ▰▰▰▱▱▱▱▱▱▱
+ * Redondea hacia arriba para que el primer acierto ya se note (1/20 → ▰▱▱…),
+ * pero solo se llena entera al completar el nivel.
+ */
 function barra(actual, total, segmentos = 10) {
-  const ratio = total > 0 ? Math.min(1, Math.max(0, actual / total)) : 0;
-  const llenos = Math.min(segmentos, Math.floor(ratio * segmentos));
+  let llenos = 0;
+  if (total > 0 && actual >= total) llenos = segmentos;
+  else if (total > 0 && actual > 0) {
+    llenos = Math.min(segmentos - 1, Math.max(1, Math.ceil((actual / total) * segmentos)));
+  }
   return '▰'.repeat(llenos) + '▱'.repeat(segmentos - llenos);
 }
 

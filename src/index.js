@@ -99,7 +99,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     const permiso = permisos.puede(interaction, comando);
     if (!permiso.ok) {
       return interaction
-        .reply({ content: `⛔ ${permiso.motivo}`, flags: MessageFlags.Ephemeral })
+        .reply({ content: permiso.motivo, flags: MessageFlags.Ephemeral })
         .catch(() => {});
     }
 
@@ -123,7 +123,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
   const permiso = permisos.puede(interaction, interaction.commandName);
   if (!permiso.ok) {
     return interaction
-      .reply({ content: `⛔ ${permiso.motivo}`, flags: MessageFlags.Ephemeral })
+      .reply({ content: permiso.motivo, flags: MessageFlags.Ephemeral })
       .catch(() => {});
   }
 
