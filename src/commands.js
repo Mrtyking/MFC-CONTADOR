@@ -494,10 +494,15 @@ const handlers = {
 
     const avisos = [];
     if (faltan.length) avisos.push(`Me faltan permisos ahí: **${faltan.join(', ')}**`);
-    if (!resolverEmoji(interaction.client, cfg.emojiOk)) {
-      avisos.push(
-        `No encuentro el emoji \`${cfg.emojiOk}\`. Tengo que estar en el servidor donde vive ese emoji; mientras tanto reaccionaré con ✅.`,
-      );
+    for (const [emoji, respaldo] of [
+      [cfg.emojiOk, '✅'],
+      [cfg.emojiFail, '❌'],
+    ]) {
+      if (!resolverEmoji(interaction.client, emoji)) {
+        avisos.push(
+          `No encuentro el emoji \`${emoji}\`. Tengo que estar en el servidor donde vive ese emoji; mientras tanto reaccionaré con ${respaldo}.`,
+        );
+      }
     }
     if (!interaction.guild.members.me.permissions.has(PermissionFlagsBits.ModerateMembers)) {
       avisos.push(

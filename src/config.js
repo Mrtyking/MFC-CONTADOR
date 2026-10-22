@@ -7,7 +7,7 @@
 const DEFAULTS = {
   // --- Reacciones ---
   emojiOk: '1291246124006510623', // emoji del check (ID del emoji personalizado)
-  emojiFail: '❌',
+  emojiFail: '1545719040608174150', // emoji de cuando se rompe la cadena (si no lo encuentra, ❌)
   emojiHito: '🎉',
 
   // --- Reglas del conteo ---

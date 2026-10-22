@@ -215,7 +215,7 @@ La fórmula es `xpBase × (nivel+1) ^ xpExponente`. Sube `xpExponente` para hace
 | Ajuste | Por defecto | Qué hace |
 |---|---|---|
 | `emojiOk` | `1291246124006510623` | Emoji del check (ID o unicode) |
-| `emojiFail` | `❌` | Reacción cuando se rompe |
+| `emojiFail` | `1545719040608174150` | Reacción cuando se rompe (ID o unicode) |
 | `permitirRepetir` | `false` | Permitir contar dos veces seguidas |
 | `celebrarHitos` | `true` | Reacción extra en múltiplos de 100 |
 | `borrarInvalidos` | `false` | Borrar mensajes que no son números |
@@ -269,12 +269,13 @@ Todos los mensajes del bot usan **Components V2**, el sistema nuevo de Discord: 
 
 Los botones piden el mismo permiso que su comando. Lo que abren desde un mensaje público sale como mensaje efímero, para no llenar el canal.
 
-### El emoji del check
+### Los emojis de acierto y fallo
 
-`emojiOk` está puesto al ID `1291246124006510623`. Para que funcione, **el bot tiene que estar en el servidor donde vive ese emoji**. Si no lo encuentra, reacciona con ✅ y `/setcanal` te avisa. También puedes poner un emoji normal:
+`emojiOk` está puesto al ID `1291246124006510623` y `emojiFail` al ID `1545719040608174150`. Para que funcionen, **el bot tiene que estar en el servidor donde viven esos emojis**. Si no los encuentra, reacciona con ✅ o ❌ y `/setcanal` te avisa. También puedes poner un emoji normal:
 
 ```
 /config poner ajuste:emojiOk valor:✅
+/config poner ajuste:emojiFail valor:❌
 ```
 
 ## Comprobar que todo está bien
