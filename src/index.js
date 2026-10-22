@@ -14,7 +14,7 @@ const {
 const store = require('./store');
 const permisos = require('./permisos');
 const sanciones = require('./sanciones');
-const { definiciones, handlers } = require('./commands');
+const { definiciones, handlers, comandoDe, manejarComponente } = require('./commands');
 const { manejarMensaje, manejarBorrado, manejarEdicion } = require('./counting');
 
 const TOKEN = process.env.DISCORD_TOKEN;
@@ -91,6 +91,31 @@ client.once(Events.ClientReady, async (c) => {
 client.on(Events.GuildCreate, (guild) => registrarEn(guild));
 
 client.on(Events.InteractionCreate, async (interaction) => {
+  // Botones y menús de los paneles: piden el mismo permiso que su comando
+  if ((interaction.isButton() || interaction.isStringSelectMenu()) && interaction.inGuild()) {
+    const comando = comandoDe(interaction.customId);
+    if (!comando) return;
+
+    const permiso = permisos.puede(interaction, comando);
+    if (!permiso.ok) {
+      return interaction
+        .reply({ content: `⛔ ${permiso.motivo}`, flags: MessageFlags.Ephemeral })
+        .catch(() => {});
+    }
+
+    try {
+      await manejarComponente(interaction);
+    } catch (err) {
+      console.error(`[botón ${interaction.customId}]`, err);
+      const aviso = { content: 'Ups, algo falló con ese botón.', flags: MessageFlags.Ephemeral };
+      try {
+        if (interaction.deferred || interaction.replied) await interaction.followUp(aviso);
+        else await interaction.reply(aviso);
+      } catch {}
+    }
+    return;
+  }
+
   if (!interaction.isChatInputCommand()) return;
   const handler = handlers[interaction.commandName];
   if (!handler) return;

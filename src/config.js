@@ -36,6 +36,9 @@ const DEFAULTS = {
   xpBase: 20, // dificultad base del nivel 1
   xpExponente: 1.25, // cuánto se encarece cada nivel siguiente
   segmentosBarra: 10, // ▱▱▱▱▱▱▱▱▱▱
+
+  // --- Apariencia ---
+  banner: '', // URL de una imagen o GIF grande arriba de /contador y /ayuda ('' = sin banner)
 };
 
 /** Claves que /config acepta, con su tipo y límites. */
@@ -57,6 +60,7 @@ const ESQUEMA = {
   xpPorAcierto: { tipo: 'num', min: 0, max: 100 },
   xpBase: { tipo: 'num', min: 1, max: 10000 },
   xpExponente: { tipo: 'num', min: 1, max: 3 },
+  banner: { tipo: 'url' },
 };
 
 module.exports = { DEFAULTS, ESQUEMA };

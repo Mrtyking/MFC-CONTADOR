@@ -1,11 +1,12 @@
 'use strict';
 
-const { EmbedBuilder, PermissionFlagsBits } = require('discord.js');
+const { PermissionFlagsBits } = require('discord.js');
 const store = require('./store');
 const levels = require('./levels');
 const sanciones = require('./sanciones');
 const { calcularCastigo } = require('./timeouts');
 const { parseNumero, formatDuracion, resolverEmoji } = require('./utils');
+const { Panel, boton, aviso } = require('./ui');
 
 const COLOR_OK = 0x57f287;
 const COLOR_FAIL = 0xed4245;
@@ -83,16 +84,12 @@ async function manejarMensaje(message) {
     const nivelNuevo = levels.subioDeNivel(xpAntes, canal.xp, cfg);
     if (nivelNuevo) {
       const info = levels.calcular(canal.xp, cfg);
-      const embed = new EmbedBuilder()
-        .setColor(COLOR_OK)
-        .setTitle('¡Nivel alcanzado!')
-        .setDescription(`El canal subió al **nivel ${nivelNuevo}**.`)
-        .addFields({
-          name: 'Progreso',
-          value: `\`[${info.barra}] ${info.xp} / ${info.siguiente}\``,
-        });
+      const panel = new Panel(COLOR_OK)
+        .cabecera('⭐ ¡Nivel alcanzado!', { subtitulo: `El canal subió al **nivel ${nivelNuevo}**.` })
+        .separador()
+        .cita(`\`[${info.barra}] ${info.xp} / ${info.siguiente}\``);
       try {
-        await message.channel.send({ embeds: [embed] });
+        await message.channel.send(panel.mensaje());
       } catch {}
     }
     return;
@@ -153,41 +150,34 @@ async function manejarMensaje(message) {
   }
 
   const info = levels.calcular(canal.xp, cfg);
-  const embed = new EmbedBuilder()
-    .setColor(COLOR_FAIL)
-    .setAuthor({
-      name: message.author.username,
-      iconURL: message.author.displayAvatarURL({ size: 64 }) || undefined,
+  const panel = new Panel(COLOR_FAIL)
+    .cabecera('💥 Cadena rota', {
+      subtitulo:
+        motivo === MOTIVO.TURNO
+          ? `**${message.author.username}** envió \`${numero}\` — **no puedes contar dos veces seguidas**`
+          : `**${message.author.username}** envió \`${numero}\` — se esperaba \`${esperado}\``,
+      imagen: message.author.displayAvatarURL({ size: 128 }) || undefined,
     })
-    .setTitle('Cadena rota')
-    .setDescription(
-      motivo === MOTIVO.TURNO
-        ? `Envió \`${numero}\` — **no puedes contar dos veces seguidas**`
-        : `Envió \`${numero}\` — se esperaba \`${esperado}\``,
-    )
-    .addFields(
-      { name: 'Llegaron hasta', value: `\`${llegoHasta}\``, inline: true },
-      { name: 'Récord', value: `\`${canal.record}\``, inline: true },
-      {
-        name: 'Timeout',
-        value: resultado.ok ? `\`${formatDuracion(castigo.ms)}\`` : '`—`',
-        inline: true,
-      },
-      {
-        name: 'Infracciones',
-        value:
-          castigo.multiplicador > 1
-            ? `\`${castigo.infracciones}\` · castigo \`×${castigo.multiplicador}\``
-            : `\`${castigo.infracciones}\``,
-        inline: false,
-      },
-      { name: 'Nivel', value: `\`[${info.barra}] ${info.xp} / ${info.siguiente}\``, inline: false },
-    )
-    .setFooter({ text: 'El contador vuelve a 1 · Respeta el turno' })
-    .setTimestamp();
+    .separador()
+    .campos([
+      ['📍', 'Llegaron hasta', `\`${llegoHasta}\``],
+      ['🏆', 'Récord', `\`${canal.record}\``],
+      ['⏱️', 'Timeout', resultado.ok ? `\`${formatDuracion(castigo.ms)}\`` : '`—`'],
+      [
+        '⚠️',
+        'Infracciones',
+        castigo.multiplicador > 1
+          ? `\`${castigo.infracciones}\` · castigo \`×${castigo.multiplicador}\``
+          : `\`${castigo.infracciones}\``,
+      ],
+      ['⭐', 'Nivel', `\`[${info.barra}] ${info.xp} / ${info.siguiente}\``],
+    ])
+    .separador()
+    .botones(boton('mfc:nivel', 'Mi nivel', '📊'), boton('mfc:top', 'Top', '🏆'))
+    .pie(`El contador vuelve a 1 · Respeta el turno · <t:${Math.floor(Date.now() / 1000)}:t>`);
 
   try {
-    await message.channel.send({ embeds: [embed] });
+    await message.channel.send(panel.mensaje());
   } catch {}
 }
 
@@ -200,13 +190,13 @@ async function manejarBorrado(message) {
   const canal = store.getCanal(message.guild.id, message.channelId);
   if (!canal || canal.ultimoMensajeId !== message.id) return;
 
-  const embed = new EmbedBuilder()
-    .setColor(COLOR_INFO)
-    .setDescription(
-      `<@${message.author.id}> borró su mensaje. El último número sigue siendo **${canal.actual}**, va el **${canal.actual + 1}**.`,
-    );
+  const panel = aviso(
+    COLOR_INFO,
+    '🗑️ Número borrado',
+    `<@${message.author.id}> borró su mensaje. El último número sigue siendo **${canal.actual}**, va el **${canal.actual + 1}**.`,
+  );
   try {
-    await message.channel.send({ embeds: [embed] });
+    await message.channel.send(panel.mensaje());
   } catch {}
 }
 
@@ -222,13 +212,13 @@ async function manejarEdicion(_antes, despues) {
   const numero = parseNumero(despues.content ?? '');
   if (numero === canal.actual) return; // no cambió el número
 
-  const embed = new EmbedBuilder()
-    .setColor(COLOR_INFO)
-    .setDescription(
-      `<@${despues.author.id}> editó su número. No cuenta: el contador sigue en **${canal.actual}**, va el **${canal.actual + 1}**.`,
-    );
+  const panel = aviso(
+    COLOR_INFO,
+    '✏️ Número editado',
+    `<@${despues.author.id}> editó su número. No cuenta: el contador sigue en **${canal.actual}**, va el **${canal.actual + 1}**.`,
+  );
   try {
-    await despues.channel.send({ embeds: [embed] });
+    await despues.channel.send(panel.mensaje());
   } catch {}
 }
 

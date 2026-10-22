@@ -235,6 +235,7 @@ La fórmula es `xpBase × (nivel+1) ^ xpExponente`. Sube `xpExponente` para hace
 | `xpPorAcierto` | `1` | XP por número correcto |
 | `xpBase` | `20` | Coste base de nivel |
 | `xpExponente` | `1.25` | Cuánto se encarece cada nivel |
+| `banner` | — | URL de una imagen o GIF que sale arriba de `/contador` y `/ayuda` (`no` para quitarlo) |
 
 Ejemplos:
 
@@ -242,7 +243,19 @@ Ejemplos:
 /config poner ajuste:minutosPorNumero valor:2
 /config poner ajuste:permitirRepetir valor:true
 /config poner ajuste:xpExponente valor:1.5
+/config poner ajuste:banner valor:https://.../banner.gif
 ```
+
+### Mensajes (Components V2)
+
+Todos los mensajes del bot usan **Components V2**, el sistema nuevo de Discord: un contenedor con la barra de color, títulos con icono, citas con la barra gris, separadores y los **botones y menús dentro del propio mensaje**. Hace falta discord.js 14.19 o superior.
+
+- `/contador`: botones 🔄 Actualizar, 📊 Mi nivel, 🏆 Top y ❓ Ayuda.
+- `/top`: menú para cambiar de ranking.
+- `/ayuda`: botones por sección y menú desplegable.
+- Cadena rota: botones 📊 Mi nivel y 🏆 Top.
+
+Los botones piden el mismo permiso que su comando. Lo que abren desde un mensaje público sale como mensaje efímero, para no llenar el canal.
 
 ### El emoji del check
 

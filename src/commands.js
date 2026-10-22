@@ -2,7 +2,6 @@
 
 const {
   SlashCommandBuilder,
-  EmbedBuilder,
   PermissionFlagsBits,
   ChannelType,
   MessageFlags,
@@ -16,6 +15,7 @@ const { formatDuracion, tsRelativo, resolverEmoji } = require('./utils');
 const { COLOR_OK, COLOR_FAIL, COLOR_INFO } = require('./counting');
 const permisos = require('./permisos');
 const sanciones = require('./sanciones');
+const { Panel, boton, desplegable, aviso } = require('./ui');
 
 const efimero = (contenido) => ({ content: contenido, flags: MessageFlags.Ephemeral });
 
@@ -159,7 +159,7 @@ const definiciones = [
             .addChoices(...Object.keys(ESQUEMA).slice(0, 25).map((k) => ({ name: k, value: k }))),
         )
         .addStringOption((o) =>
-          o.setName('valor').setDescription('Nuevo valor (true/false o un número)').setRequired(true),
+          o.setName('valor').setDescription('Nuevo valor (true/false, un número o una URL)').setRequired(true),
         ),
     )
     .addSubcommand((s) => s.setName('reset').setDescription('Vuelve a los valores por defecto'))
@@ -178,6 +178,230 @@ const definiciones = [
     .setDescription('Cómo funciona el contador')
     .setContexts(InteractionContextType.Guild),
 ].map((c) => c.toJSON());
+
+/* ------------------------------------------------------------------ */
+/* Paneles (los comparten los comandos y los botones)                  */
+/* ------------------------------------------------------------------ */
+
+const PIE = '© MFC Contador';
+
+const TOPS = {
+  aciertos: { label: 'Aciertos', emoji: '✅' },
+  mejorRacha: { label: 'Mejor racha', emoji: '🔥' },
+  fallos: { label: 'Fallos', emoji: '💥' },
+};
+
+/** Botones que van debajo de los paneles públicos. */
+const botonesConsulta = () => [
+  boton('mfc:nivel', 'Mi nivel', '📊'),
+  boton('mfc:top', 'Top', '🏆'),
+  boton('mfc:ayuda', 'Ayuda', '❓'),
+];
+
+function panelContador(guildId, canalId, client) {
+  const cfg = store.getConfig(guildId);
+  const canal = store.getCanal(guildId, canalId);
+  if (!canal) return null;
+
+  const info = levels.calcular(canal.xp, cfg);
+  return new Panel(COLOR_OK)
+    .banner(cfg.banner)
+    .cabecera('🔢 Contador', {
+      subtitulo: `Toca el **${canal.actual + 1}**`,
+      imagen: client.user?.displayAvatarURL({ size: 128 }),
+    })
+    .separador()
+    .campos([
+      ['📍', 'Actual', `\`${canal.actual}\``],
+      ['🏆', 'Récord', `\`${canal.record}\``],
+      ['👤', 'Último', canal.ultimoUsuario ? `<@${canal.ultimoUsuario}>` : '`—`'],
+      ['✅', 'Aciertos', `\`${canal.totalAciertos}\``],
+      ['💥', 'Cadenas rotas', `\`${canal.totalFallos}\``],
+    ])
+    .separador()
+    .cita(
+      `⭐ **Nivel ${info.nivel}**\n\`[${info.barra}] ${info.xp} / ${info.siguiente}\` · faltan \`${info.faltan}\``,
+    )
+    .botones(boton('mfc:contador:actualizar', 'Actualizar', '🔄'), ...botonesConsulta())
+    .pie(`${PIE} · Actualizado ${tsRelativo(Date.now())}`);
+}
+
+function panelNivel(guildId, canalId, objetivo) {
+  const cfg = store.getConfig(guildId);
+  const g = store.getGuild(guildId);
+  const u = g.usuarios[objetivo.id];
+  const canal = store.getCanal(guildId, canalId) ?? g.canales[Object.keys(g.canales)[0]];
+
+  const panel = new Panel(COLOR_INFO).cabecera(`📊 ${objetivo.username}`, {
+    subtitulo: `Estadísticas de <@${objetivo.id}>`,
+    imagen: objetivo.displayAvatarURL({ size: 128 }),
+  });
+
+  if (canal) {
+    const info = levels.calcular(canal.xp, cfg);
+    panel.cita(`⭐ **Nivel del canal — ${info.nivel}**\n\`[${info.barra}] ${info.xp} / ${info.siguiente}\``);
+  }
+
+  panel.separador();
+
+  if (!u) return panel.texto('Todavía no ha contado nada.').pie(PIE);
+
+  const ventanaMs = cfg.ventanaSpamMin * 60 * 1000;
+  const infraccionesVivas =
+    u.ultimaInfraccion && Date.now() - u.ultimaInfraccion <= ventanaMs ? u.infracciones : 0;
+
+  panel.campos([
+    ['✅', 'Aciertos', `\`${u.aciertos}\``],
+    ['💥', 'Fallos', `\`${u.fallos}\``],
+    ['🔥', 'Mejor racha', `\`${u.mejorRacha}\``],
+    ['📈', 'Racha actual', `\`${u.rachaActual}\``],
+    [
+      '⚠️',
+      'Infracciones activas',
+      infraccionesVivas ? `\`${infraccionesVivas}\` · última ${tsRelativo(u.ultimaInfraccion)}` : '`0`',
+    ],
+    ['🔇', 'Tiempo silenciado', `\`${formatDuracion(u.totalTimeoutMs)}\``],
+  ]);
+
+  const sancion = sanciones.sancionDe(guildId, objetivo.id);
+  if (sancion) {
+    panel.separador().cita(
+      `🛡️ **Roles retirados (${sancion.roles.length})** · se le devuelven <t:${Math.floor(sancion.hasta / 1000)}:R>\n${(sancion.nombres ?? [])
+        .slice(0, 10)
+        .map((n) => `\`${n}\``)
+        .join(', ')}`,
+    );
+  }
+
+  return panel.pie(PIE);
+}
+
+function panelTop(guildId, tipo) {
+  const g = store.getGuild(guildId);
+  const lista = Object.entries(g.usuarios)
+    .map(([id, u]) => ({ id, valor: u[tipo] ?? 0 }))
+    .filter((x) => x.valor > 0)
+    .sort((a, b) => b.valor - a.valor)
+    .slice(0, 10);
+
+  const medallas = ['🥇', '🥈', '🥉'];
+  const texto = lista.length
+    ? lista
+        .map((x, i) => `${medallas[i] ?? `\`${String(i + 1).padStart(2, ' ')}.\``} <@${x.id}> — **${x.valor}**`)
+        .join('\n')
+    : 'Todavía no hay datos para este ranking.';
+
+  return new Panel(COLOR_INFO)
+    .cabecera(`🏆 Top ${TOPS[tipo].label}`)
+    .cita('Los 10 mejores del servidor. Cambia de ranking en el menú.')
+    .separador()
+    .texto(texto)
+    .separador()
+    .menu(
+      desplegable(
+        'mfc:top:menu',
+        'Elige un ranking',
+        Object.entries(TOPS).map(([value, t]) => ({ value, label: t.label, emoji: t.emoji })),
+        tipo,
+      ),
+    )
+    .pie(PIE);
+}
+
+/** Secciones de /ayuda. Cada una sale con su botón y en el menú. */
+const AYUDA = {
+  inicio: { label: 'Inicio', emoji: '📖', resumen: 'Cómo se juega' },
+  timeouts: { label: 'Timeouts', emoji: '⏱️', resumen: 'Cuánto dura el castigo según el número' },
+  reincidencia: { label: 'Reincidencia', emoji: '🔁', resumen: 'Qué pasa si la rompes otra vez' },
+  niveles: { label: 'Niveles', emoji: '⭐', resumen: 'Cómo sube de nivel el canal' },
+  admins: { label: 'Admins', emoji: '🛡️', resumen: 'Por qué los admins tampoco se salvan' },
+  comandos: { label: 'Comandos', emoji: '⌨️', resumen: 'Todo lo que puedes usar' },
+};
+
+function contenidoAyuda(guildId, seccion) {
+  const cfg = store.getConfig(guildId);
+  const ejemplo = (n) =>
+    `\`${n}\` → ${formatDuracion(Math.max(cfg.timeoutMinimoMin, Math.round(n * cfg.minutosPorNumero)) * 60000)}`;
+
+  switch (seccion) {
+    case 'timeouts':
+      return `${cfg.minutosPorNumero} minuto(s) por número, mínimo ${cfg.timeoutMinimoMin}.\n\n${[4, 30, 120, 500]
+        .map(ejemplo)
+        .join('\n')}`;
+    case 'reincidencia':
+      return `Si vuelves a romperla antes de ${formatDuracion(cfg.ventanaSpamMin * 60000)}, el castigo se multiplica **×${cfg.multiplicadorSpam}** cada vez (tope ×${cfg.maxMultiplicadorSpam}).\n\nSi aguantas esa ventana sin romper nada, vuelves al castigo normal.`;
+    case 'niveles':
+      return `Cada acierto da ${cfg.xpPorAcierto} XP al canal. Cada nivel cuesta más que el anterior:\n\n${[0, 1, 2, 3, 4]
+        .map((n) => `\`nivel ${n} → ${n + 1}\` ${levels.xpParaSubir(n, cfg)} XP`)
+        .join('\n')}`;
+    case 'admins':
+      return 'No. Discord ignora el timeout de los administradores, así que el bot les quita los roles primero, aplica el castigo y **se los devuelve solo** cuando termina.\n\nAl dueño del servidor no se le puede tocar (eso es límite de Discord).';
+    case 'comandos':
+      return `${Object.keys(permisos.NIVELES)
+        .map((cmd) => `\`/${cmd}\`${permisos.nivelDe(guildId, cmd) === permisos.ADMIN ? ' 🔒' : ''}`)
+        .join('  ')}\n\n-# 🔒 = solo para los roles con permiso`;
+    default:
+      return null;
+  }
+}
+
+function panelAyuda(guildId, seccion = 'inicio') {
+  const cfg = store.getConfig(guildId);
+  const actual = AYUDA[seccion] ? seccion : 'inicio';
+  const panel = new Panel(COLOR_INFO);
+
+  if (actual === 'inicio') {
+    panel
+      .banner(cfg.banner)
+      .cabecera('📖 Cómo funciona el contador')
+      .cita('Elige una sección abajo para ver los detalles.')
+      .separador()
+      .texto(
+        [
+          '**¿Cómo se juega?**',
+          '**1.** Se cuenta de uno en uno en el canal configurado.',
+          `**2.** ${cfg.permitirRepetir ? 'Puedes contar seguido.' : 'No puedes contar dos veces seguidas: hay que respetar el turno.'}`,
+          '**3.** Si el número está mal, la cadena se rompe, vuelve al 1 y quien la rompió se lleva un timeout.',
+        ].join('\n'),
+      )
+      .separador()
+      .cita(
+        Object.entries(AYUDA)
+          .filter(([k]) => k !== 'inicio')
+          .map(([, s]) => `${s.emoji} **${s.label}:** ${s.resumen}.`)
+          .join('\n'),
+      );
+  } else {
+    const s = AYUDA[actual];
+    panel
+      .cabecera(`${s.emoji} ${s.label}`)
+      .cita(`${s.resumen}.`)
+      .separador()
+      .texto(contenidoAyuda(guildId, actual));
+  }
+
+  return panel
+    .botones(
+      Object.entries(AYUDA)
+        .filter(([k]) => k !== 'inicio')
+        .slice(0, 5)
+        .map(([k, s]) => boton(`mfc:ayuda:${k}`, s.label, s.emoji, k === actual)),
+    )
+    .menu(
+      desplegable(
+        'mfc:ayuda:menu',
+        'Elige una opción',
+        Object.entries(AYUDA).map(([value, s]) => ({
+          value,
+          label: s.label,
+          description: s.resumen,
+          emoji: s.emoji,
+        })),
+        actual,
+      ),
+    )
+    .pie(`${PIE} · Todos los derechos reservados.`);
+}
 
 /* ------------------------------------------------------------------ */
 /* Handlers                                                            */
@@ -235,14 +459,16 @@ async function levantarCastigo(interaction, { borrarInfracciones }) {
   }
 
   const fallo = lineas.some((l) => l.includes('No pude'));
-  await interaction.reply({
-    embeds: [
-      new EmbedBuilder()
-        .setColor(fallo ? COLOR_FAIL : COLOR_OK)
-        .setTitle(borrarInfracciones ? 'Perdonado' : 'Timeout retirado')
-        .setDescription(`<@${objetivo.id}>\n${lineas.join('\n')}`),
-    ],
-  });
+  await interaction.reply(
+    new Panel(fallo ? COLOR_FAIL : COLOR_OK)
+      .cabecera(borrarInfracciones ? '🕊️ Perdonado' : '🔓 Timeout retirado', {
+        subtitulo: `<@${objetivo.id}>`,
+        imagen: objetivo.displayAvatarURL({ size: 128 }),
+      })
+      .separador()
+      .texto(lineas.join('\n'))
+      .mensaje(),
+  );
 }
 
 const handlers = {
@@ -275,28 +501,27 @@ const handlers = {
     if (empezarEn > canal.record) canal.record = empezarEn;
     store.guardar();
 
-    const emoji = resolverEmoji(interaction.client, cfg.emojiOk);
-    const avisoEmoji = emoji
-      ? ''
-      : `\n⚠️ No encuentro el emoji \`${cfg.emojiOk}\`. Tengo que estar en el servidor donde vive ese emoji; mientras tanto reaccionaré con ✅.`;
-
-    const embed = new EmbedBuilder()
-      .setColor(COLOR_OK)
-      .setTitle(nuevo ? 'Canal de conteo configurado' : 'Canal de conteo actualizado')
-      .setDescription(
-        `${canalDiscord} queda como canal del contador.\nEmpieza en **${empezarEn}**, o sea que toca el **${empezarEn + 1}**.` +
-          (faltan.length ? `\n\n⚠️ Me faltan permisos ahí: **${faltan.join(', ')}**` : '') +
-          avisoEmoji,
+    const avisos = [];
+    if (faltan.length) avisos.push(`⚠️ Me faltan permisos ahí: **${faltan.join(', ')}**`);
+    if (!resolverEmoji(interaction.client, cfg.emojiOk)) {
+      avisos.push(
+        `⚠️ No encuentro el emoji \`${cfg.emojiOk}\`. Tengo que estar en el servidor donde vive ese emoji; mientras tanto reaccionaré con ✅.`,
       );
-
+    }
     if (!interaction.guild.members.me.permissions.has(PermissionFlagsBits.ModerateMembers)) {
-      embed.addFields({
-        name: '⚠️ Sin permiso para timeouts',
-        value: 'Dame el permiso **Aislar miembros** (Moderate Members) o no podré castigar a quien rompa la cadena.',
-      });
+      avisos.push(
+        '⚠️ **Sin permiso para timeouts.** Dame el permiso **Aislar miembros** (Moderate Members) o no podré castigar a quien rompa la cadena.',
+      );
     }
 
-    await interaction.reply({ embeds: [embed] });
+    const panel = new Panel(COLOR_OK)
+      .cabecera(nuevo ? '✅ Canal de conteo configurado' : '✅ Canal de conteo actualizado')
+      .texto(
+        `${canalDiscord} queda como canal del contador.\nEmpieza en **${empezarEn}**, o sea que toca el **${empezarEn + 1}**.`,
+      );
+    if (avisos.length) panel.separador().cita(avisos.join('\n'));
+
+    await interaction.reply(panel.mensaje());
   },
 
   async quitarcanal(interaction) {
@@ -319,25 +544,21 @@ const handlers = {
     }
     store.guardar();
 
-    await interaction.reply({
-      embeds: [
-        new EmbedBuilder()
-          .setColor(COLOR_INFO)
-          .setDescription(
-            `Ya no llevo el contador en ${canalDiscord}.` +
-              (borrar ? ' Datos borrados.' : ' Guardé el nivel y el récord por si lo reactivas.'),
-          ),
-      ],
-    });
+    await interaction.reply(
+      aviso(
+        COLOR_INFO,
+        '🛑 Canal quitado',
+        `Ya no llevo el contador en ${canalDiscord}.` +
+          (borrar ? ' Datos borrados.' : ' Guardé el nivel y el récord por si lo reactivas.'),
+      ).mensaje(),
+    );
   },
 
   async contador(interaction) {
-    const cfg = store.getConfig(interaction.guild.id);
-    const g = store.getGuild(interaction.guild.id);
-    const canal = store.getCanal(interaction.guild.id, interaction.channel.id);
+    const panel = panelContador(interaction.guild.id, interaction.channel.id, interaction.client);
 
-    if (!canal) {
-      const otros = Object.keys(g.canales);
+    if (!panel) {
+      const otros = Object.keys(store.getGuild(interaction.guild.id).canales);
       return interaction.reply(
         efimero(
           otros.length
@@ -347,119 +568,17 @@ const handlers = {
       );
     }
 
-    const info = levels.calcular(canal.xp, cfg);
-    const embed = new EmbedBuilder()
-      .setColor(COLOR_OK)
-      .setTitle('Contador')
-      .setDescription(`Va el **${canal.actual + 1}**`)
-      .addFields(
-        { name: 'Actual', value: `\`${canal.actual}\``, inline: true },
-        { name: 'Récord', value: `\`${canal.record}\``, inline: true },
-        {
-          name: 'Último',
-          value: canal.ultimoUsuario ? `<@${canal.ultimoUsuario}>` : '`—`',
-          inline: true,
-        },
-        { name: 'Aciertos', value: `\`${canal.totalAciertos}\``, inline: true },
-        { name: 'Cadenas rotas', value: `\`${canal.totalFallos}\``, inline: true },
-        { name: 'Nivel', value: `\`${info.nivel}\``, inline: true },
-        {
-          name: 'Progreso',
-          value: `\`[${info.barra}] ${info.xp} / ${info.siguiente}\`  ·  faltan \`${info.faltan}\``,
-        },
-      );
-
-    await interaction.reply({ embeds: [embed] });
+    await interaction.reply(panel.mensaje());
   },
 
   async nivel(interaction) {
-    const cfg = store.getConfig(interaction.guild.id);
     const objetivo = interaction.options.getUser('usuario') ?? interaction.user;
-    const g = store.getGuild(interaction.guild.id);
-    const u = g.usuarios[objetivo.id];
-
-    const canal =
-      store.getCanal(interaction.guild.id, interaction.channel.id) ??
-      g.canales[Object.keys(g.canales)[0]];
-
-    const embed = new EmbedBuilder()
-      .setColor(COLOR_INFO)
-      .setAuthor({ name: objetivo.username, iconURL: objetivo.displayAvatarURL({ size: 64 }) });
-
-    if (canal) {
-      const info = levels.calcular(canal.xp, cfg);
-      embed.addFields({
-        name: `Nivel del canal — ${info.nivel}`,
-        value: `\`[${info.barra}] ${info.xp} / ${info.siguiente}\``,
-      });
-    }
-
-    if (!u) {
-      embed.setDescription('Todavía no ha contado nada.');
-      return interaction.reply({ embeds: [embed] });
-    }
-
-    const ventanaMs = cfg.ventanaSpamMin * 60 * 1000;
-    const infraccionesVivas =
-      u.ultimaInfraccion && Date.now() - u.ultimaInfraccion <= ventanaMs ? u.infracciones : 0;
-
-    embed.addFields(
-      { name: 'Aciertos', value: `\`${u.aciertos}\``, inline: true },
-      { name: 'Fallos', value: `\`${u.fallos}\``, inline: true },
-      { name: 'Mejor racha', value: `\`${u.mejorRacha}\``, inline: true },
-      { name: 'Racha actual', value: `\`${u.rachaActual}\``, inline: true },
-      {
-        name: 'Infracciones activas',
-        value: infraccionesVivas
-          ? `\`${infraccionesVivas}\` · última ${tsRelativo(u.ultimaInfraccion)}`
-          : '`0`',
-        inline: true,
-      },
-      { name: 'Tiempo silenciado', value: `\`${formatDuracion(u.totalTimeoutMs)}\``, inline: true },
-    );
-
-    const sancion = sanciones.sancionDe(interaction.guild.id, objetivo.id);
-    if (sancion) {
-      embed.addFields({
-        name: `Roles retirados (${sancion.roles.length})`,
-        value: `Se le devuelven <t:${Math.floor(sancion.hasta / 1000)}:R>\n${(sancion.nombres ?? [])
-          .slice(0, 10)
-          .map((n) => `\`${n}\``)
-          .join(', ')}`,
-      });
-    }
-
-    await interaction.reply({ embeds: [embed] });
+    await interaction.reply(panelNivel(interaction.guild.id, interaction.channel.id, objetivo).mensaje());
   },
 
   async top(interaction) {
     const tipo = interaction.options.getString('tipo') ?? 'aciertos';
-    const g = store.getGuild(interaction.guild.id);
-    const etiquetas = { aciertos: 'Aciertos', mejorRacha: 'Mejor racha', fallos: 'Fallos' };
-
-    const lista = Object.entries(g.usuarios)
-      .map(([id, u]) => ({ id, valor: u[tipo] ?? 0 }))
-      .filter((x) => x.valor > 0)
-      .sort((a, b) => b.valor - a.valor)
-      .slice(0, 10);
-
-    if (!lista.length) {
-      return interaction.reply(efimero('Todavía no hay datos para el ranking.'));
-    }
-
-    const medallas = ['🥇', '🥈', '🥉'];
-    const texto = lista
-      .map((x, i) => `${medallas[i] ?? `\`${String(i + 1).padStart(2, ' ')}.\``} <@${x.id}> — **${x.valor}**`)
-      .join('\n');
-
-    await interaction.reply({
-      embeds: [
-        new EmbedBuilder()
-          .setColor(COLOR_INFO)
-          .setTitle(`Top ${etiquetas[tipo]}`)
-          .setDescription(texto),
-      ],
-    });
+    await interaction.reply(panelTop(interaction.guild.id, tipo).mensaje());
   },
 
   async reiniciar(interaction) {
@@ -472,13 +591,9 @@ const handlers = {
     canal.ultimoMensajeId = null;
     store.guardar();
 
-    await interaction.reply({
-      embeds: [
-        new EmbedBuilder()
-          .setColor(COLOR_INFO)
-          .setDescription(`Contador reiniciado. Ahora va el **${numero + 1}**.`),
-      ],
-    });
+    await interaction.reply(
+      aviso(COLOR_INFO, '♻️ Contador reiniciado', `Ahora va el **${numero + 1}**.`).mensaje(),
+    );
   },
 
   async quitartimeout(interaction) {
@@ -505,19 +620,17 @@ const handlers = {
       `Devueltos a mano por ${interaction.user.tag}`,
     );
 
-    await interaction.reply({
-      embeds: [
-        new EmbedBuilder()
-          .setColor(r.ok ? COLOR_OK : COLOR_FAIL)
-          .setDescription(
-            r.ok
-              ? `Roles devueltos a <@${objetivo.id}>: ${(sancion.nombres ?? [])
-                  .map((n) => `\`${n}\``)
-                  .join(', ')}\nSigue con el timeout puesto, si lo tenía.`
-              : `No pude devolvérselos: ${r.motivo}`,
-          ),
-      ],
-    });
+    await interaction.reply(
+      aviso(
+        r.ok ? COLOR_OK : COLOR_FAIL,
+        r.ok ? '🛡️ Roles devueltos' : '❌ No pude devolver los roles',
+        r.ok
+          ? `Roles devueltos a <@${objetivo.id}>: ${(sancion.nombres ?? [])
+              .map((n) => `\`${n}\``)
+              .join(', ')}\n-# Sigue con el timeout puesto, si lo tenía.`
+          : `No pude devolvérselos: ${r.motivo}`,
+      ).mensaje(),
+    );
   },
 
   async permisos(interaction) {
@@ -530,24 +643,21 @@ const handlers = {
         porNivel[permisos.nivelDe(interaction.guild.id, cmd)].push(`\`/${cmd}\``);
       }
 
-      return interaction.reply({
-        embeds: [
-          new EmbedBuilder()
-            .setColor(COLOR_INFO)
-            .setTitle('Permisos')
-            .addFields(
-              {
-                name: 'Roles con permiso de administración',
-                value: roles.length ? roles.map((id) => `<@&${id}>`).join('\n') : '— (ninguno)',
-              },
-              { name: 'Dueño del bot (siempre puede)', value: `<@${permisos.DUENO_BOT}>` },
-              { name: 'Comandos públicos', value: porNivel.publico.join(' ') || '—' },
-              { name: 'Comandos administrativos', value: porNivel.admin.join(' ') || '—' },
-            )
-            .setFooter({ text: 'Cámbialo con /permisos rol y /permisos comando' }),
-        ],
-        flags: MessageFlags.Ephemeral,
-      });
+      return interaction.reply(
+        new Panel(COLOR_INFO)
+          .cabecera('🔐 Permisos')
+          .cita('Quién puede usar cada comando del bot.')
+          .separador()
+          .texto(
+            `**🛡️ Roles con permiso de administración**\n${roles.length ? roles.map((id) => `<@&${id}>`).join('\n') : '— (ninguno)'}`,
+          )
+          .texto(`**👑 Dueño del bot (siempre puede)**\n<@${permisos.DUENO_BOT}>`)
+          .separador()
+          .texto(`**🌐 Comandos públicos**\n${porNivel.publico.join(' ') || '—'}`)
+          .texto(`**🔒 Comandos administrativos**\n${porNivel.admin.join(' ') || '—'}`)
+          .pie('Cámbialo con /permisos rol y /permisos comando')
+          .mensaje({ efimero: true }),
+      );
     }
 
     if (sub === 'rol') {
@@ -567,34 +677,30 @@ const handlers = {
           ),
         );
       }
-      return interaction.reply({
-        embeds: [
-          new EmbedBuilder()
-            .setColor(COLOR_OK)
-            .setDescription(
-              accion === 'añadir'
-                ? `${rol} ya puede usar los comandos administrativos.`
-                : `${rol} ya no puede usar los comandos administrativos.`,
-            ),
-        ],
-      });
+      return interaction.reply(
+        aviso(
+          COLOR_OK,
+          '🔐 Permisos actualizados',
+          accion === 'añadir'
+            ? `${rol} ya puede usar los comandos administrativos.`
+            : `${rol} ya no puede usar los comandos administrativos.`,
+        ).mensaje(),
+      );
     }
 
     // comando
     const cmd = interaction.options.getString('comando');
     const nivel = interaction.options.getString('nivel');
     permisos.ponerNivel(interaction.guild.id, cmd, nivel);
-    await interaction.reply({
-      embeds: [
-        new EmbedBuilder()
-          .setColor(COLOR_OK)
-          .setDescription(
-            nivel === 'publico'
-              ? `\`/${cmd}\` ahora lo puede usar cualquiera.`
-              : `\`/${cmd}\` ahora es solo para los roles con permiso.`,
-          ),
-      ],
-    });
+    await interaction.reply(
+      aviso(
+        COLOR_OK,
+        '🔐 Permisos actualizados',
+        nivel === 'publico'
+          ? `\`/${cmd}\` ahora lo puede usar cualquiera.`
+          : `\`/${cmd}\` ahora es solo para los roles con permiso.`,
+      ).mensaje(),
+    );
   },
 
   async config(interaction) {
@@ -605,22 +711,18 @@ const handlers = {
       const cfg = store.getConfig(interaction.guild.id);
       const lineas = Object.keys(ESQUEMA).map((k) => {
         const cambiado = Object.prototype.hasOwnProperty.call(g.config, k);
-        return `${cambiado ? '•' : ' '} ${k.padEnd(20)} ${cfg[k]}`;
+        return `${cambiado ? '•' : ' '} ${k.padEnd(20)} ${cfg[k] === '' ? '—' : cfg[k]}`;
       });
       const canales = Object.keys(g.canales);
-      return interaction.reply({
-        embeds: [
-          new EmbedBuilder()
-            .setColor(COLOR_INFO)
-            .setTitle('Configuración')
-            .setDescription(`\`\`\`\n${lineas.join('\n')}\n\`\`\`\n• = cambiado por ti`)
-            .addFields({
-              name: 'Canales de conteo',
-              value: canales.length ? canales.map((id) => `<#${id}>`).join(', ') : '—',
-            }),
-        ],
-        flags: MessageFlags.Ephemeral,
-      });
+      return interaction.reply(
+        new Panel(COLOR_INFO)
+          .cabecera('⚙️ Configuración')
+          .texto(`\`\`\`\n${lineas.join('\n')}\n\`\`\``)
+          .pie('• = cambiado por ti')
+          .separador()
+          .texto(`**📍 Canales de conteo**\n${canales.length ? canales.map((id) => `<#${id}>`).join(', ') : '—'}`)
+          .mensaje({ efimero: true }),
+      );
     }
 
     if (sub === 'reset') {
@@ -652,6 +754,16 @@ const handlers = {
           efimero(`\`${clave}\` tiene que estar entre ${esquema.min} y ${esquema.max}.`),
         );
       }
+    } else if (esquema.tipo === 'url') {
+      if (['no', 'ninguno', 'quitar', '-', 'false'].includes(bruto.toLowerCase())) {
+        valor = '';
+      } else if (/^https?:\/\/\S+$/i.test(bruto)) {
+        valor = bruto;
+      } else {
+        return interaction.reply(
+          efimero(`\`${clave}\` necesita una URL que empiece por \`https://\` (o \`no\` para quitarlo).`),
+        );
+      }
     } else {
       valor = bruto;
     }
@@ -660,7 +772,7 @@ const handlers = {
     store.guardar();
 
     await interaction.reply(
-      efimero(`\`${clave}\` = \`${valor}\`  (antes: \`${DEFAULTS[clave]}\` por defecto)`),
+      efimero(`\`${clave}\` = \`${valor || '—'}\`  (antes: \`${DEFAULTS[clave] || '—'}\` por defecto)`),
     );
   },
 
@@ -670,40 +782,39 @@ const handlers = {
     const miPos = yo.roles.highest.position;
 
     const check = (b) => (b ? '✅' : '❌');
-    const embed = new EmbedBuilder().setColor(COLOR_INFO).setTitle('Revisión del bot');
-
-    embed.addFields({
-      name: 'Permisos',
-      value: [
-        `${check(yo.permissions.has(PermissionFlagsBits.ModerateMembers))} Aislar miembros — dar timeouts`,
-        `${check(yo.permissions.has(PermissionFlagsBits.ManageRoles))} Gestionar roles — castigar administradores`,
-        `${check(yo.permissions.has(PermissionFlagsBits.AddReactions))} Añadir reacciones`,
-      ].join('\n'),
-    });
+    const panel = new Panel(COLOR_INFO)
+      .cabecera('🩺 Revisión del bot', { imagen: interaction.client.user.displayAvatarURL({ size: 128 }) })
+      .separador()
+      .texto(
+        [
+          '**Permisos**',
+          `${check(yo.permissions.has(PermissionFlagsBits.ModerateMembers))} Aislar miembros — dar timeouts`,
+          `${check(yo.permissions.has(PermissionFlagsBits.ManageRoles))} Gestionar roles — castigar administradores`,
+          `${check(yo.permissions.has(PermissionFlagsBits.AddReactions))} Añadir reacciones`,
+        ].join('\n'),
+      );
 
     const porEncima = guild.roles.cache.filter(
       (r) => r.position > miPos && !r.managed && r.id !== guild.id,
     );
-    embed.addFields({
-      name: 'Jerarquía',
-      value:
-        `Mi rol está en la posición \`${miPos}\`.\n` +
+    panel.separador().texto(
+      `**Jerarquía**\nMi rol está en la posición \`${miPos}\`.\n` +
         (porEncima.size
           ? `❌ Hay **${porEncima.size} roles por encima del mío**. A quien tenga uno de esos no puedo tocarlo, ni siendo admin.\n\n**Arrastra mi rol arriba del todo** en Ajustes del servidor → Roles.`
           : '✅ Mi rol está por encima de todos. Puedo castigar a cualquiera menos al dueño.'),
-    });
+    );
 
     const objetivo = interaction.options.getUser('usuario');
     if (objetivo) {
       const member = await guild.members.fetch(objetivo.id).catch(() => null);
+      let veredicto;
       if (!member) {
-        embed.addFields({ name: `¿Puedo castigar a ${objetivo.username}?`, value: '❌ No está en el servidor.' });
+        veredicto = '❌ No está en el servidor.';
       } else {
         const impedimento = sanciones.bloqueo(member);
         const esAdmin = member.permissions.has(PermissionFlagsBits.Administrator);
         const suPos = member.roles.highest.position;
 
-        let veredicto;
         if (impedimento) {
           veredicto = `❌ **No.** ${impedimento[0].toUpperCase()}${impedimento.slice(1)}.`;
           if (impedimento.includes('por encima')) {
@@ -720,65 +831,66 @@ const handlers = {
         } else {
           veredicto = '✅ **Sí.** Timeout normal, sin tocarle los roles.';
         }
-
-        embed.addFields({ name: `¿Puedo castigar a ${objetivo.username}?`, value: veredicto });
       }
+      panel.separador().cita(`**¿Puedo castigar a ${objetivo.username}?**\n${veredicto}`);
     }
 
-    await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+    await interaction.reply(panel.mensaje({ efimero: true }));
   },
 
   async ayuda(interaction) {
-    const cfg = store.getConfig(interaction.guild.id);
-    const ejemplo = (n) =>
-      `\`${n}\` → ${formatDuracion(
-        Math.max(cfg.timeoutMinimoMin, Math.round(n * cfg.minutosPorNumero)) * 60000,
-      )}`;
-
-    const embed = new EmbedBuilder()
-      .setColor(COLOR_INFO)
-      .setTitle('Cómo funciona el contador')
-      .setDescription(
-        [
-          '**1.** Se cuenta de uno en uno en el canal configurado.',
-          `**2.** ${cfg.permitirRepetir ? 'Puedes contar seguido.' : 'No puedes contar dos veces seguidas: hay que respetar el turno.'}`,
-          '**3.** Si el número está mal, la cadena se rompe, vuelve al 1 y quien la rompió se lleva un timeout.',
-        ].join('\n'),
-      )
-      .addFields(
-        {
-          name: 'Timeout según el número',
-          value: `${cfg.minutosPorNumero} minuto(s) por número, mínimo ${cfg.timeoutMinimoMin}.\n${[4, 30, 120, 500].map(ejemplo).join('\n')}`,
-        },
-        {
-          name: 'Reincidencia',
-          value: `Si vuelves a romperla antes de ${formatDuracion(cfg.ventanaSpamMin * 60000)}, el castigo se multiplica ×${cfg.multiplicadorSpam} cada vez (tope ×${cfg.maxMultiplicadorSpam}).\nSi aguantas esa ventana sin romper nada, vuelves al castigo normal.`,
-        },
-        {
-          name: 'Niveles',
-          value: `Cada acierto da ${cfg.xpPorAcierto} XP al canal. Cada nivel cuesta más que el anterior:\n${[0, 1, 2, 3, 4]
-            .map((n) => `nivel ${n}→${n + 1}: ${levels.xpParaSubir(n, cfg)} XP`)
-            .join(' · ')}`,
-        },
-        {
-          name: 'Y si eres admin, ¿te salvas?',
-          value:
-            'No. Discord ignora el timeout de los administradores, así que el bot les quita los roles primero, aplica el castigo y **se los devuelve solo** cuando termina. Al dueño del servidor no se le puede tocar (eso es límite de Discord).',
-        },
-        {
-          name: 'Comandos',
-          value: Object.entries(permisos.NIVELES)
-            .map(([cmd]) => {
-              const nivel = permisos.nivelDe(interaction.guild.id, cmd);
-              return `\`/${cmd}\`${nivel === permisos.ADMIN ? '🔒' : ''}`;
-            })
-            .join(' ')
-            .concat('\n🔒 = solo para los roles con permiso'),
-        },
-      );
-
-    await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+    await interaction.reply(panelAyuda(interaction.guild.id).mensaje({ efimero: true }));
   },
 };
 
-module.exports = { definiciones, handlers };
+/* ------------------------------------------------------------------ */
+/* Botones y menús                                                     */
+/* ------------------------------------------------------------------ */
+
+/**
+ * customId = "mfc:<comando>[:<arg>]". El <comando> decide el permiso, igual
+ * que si se hubiera escrito el slash command.
+ *   · Lo que cambia la vista del propio panel se hace con update().
+ *   · Lo que abre algo nuevo desde un panel público sale efímero, para no
+ *     llenar el canal.
+ */
+function comandoDe(customId) {
+  const [prefijo, comando] = customId.split(':');
+  return prefijo === 'mfc' ? comando : null;
+}
+
+async function manejarComponente(interaction) {
+  const [, comando, arg] = interaction.customId.split(':');
+  const guildId = interaction.guild.id;
+
+  // Al editar un mensaje efímero hay que repetir el flag, o deja de serlo
+  const enSuSitio = (panel) =>
+    interaction.update(
+      panel.mensaje({ efimero: interaction.message.flags.has(MessageFlags.Ephemeral) }),
+    );
+
+  if (comando === 'contador' && arg === 'actualizar') {
+    const panel = panelContador(guildId, interaction.channel.id, interaction.client);
+    if (!panel) return interaction.reply(efimero('Este canal ya no es de conteo.'));
+    return enSuSitio(panel);
+  }
+
+  if (comando === 'nivel') {
+    return interaction.reply(
+      panelNivel(guildId, interaction.channel.id, interaction.user).mensaje({ efimero: true }),
+    );
+  }
+
+  if (comando === 'top') {
+    if (arg === 'menu') return enSuSitio(panelTop(guildId, interaction.values[0]));
+    return interaction.reply(panelTop(guildId, 'aciertos').mensaje({ efimero: true }));
+  }
+
+  if (comando === 'ayuda') {
+    if (arg === 'menu') return enSuSitio(panelAyuda(guildId, interaction.values[0]));
+    if (arg) return enSuSitio(panelAyuda(guildId, arg));
+    return interaction.reply(panelAyuda(guildId).mensaje({ efimero: true }));
+  }
+}
+
+module.exports = { definiciones, handlers, comandoDe, manejarComponente };

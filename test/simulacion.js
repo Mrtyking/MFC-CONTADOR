@@ -11,7 +11,7 @@ const fs = require('node:fs');
 
 process.env.MFC_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'mfc-test-'));
 
-const { Collection, PermissionFlagsBits } = require('discord.js');
+const { Collection, PermissionFlagsBits, MessageFlags } = require('discord.js');
 const store = require('../src/store');
 const levels = require('../src/levels');
 const sanciones = require('../src/sanciones');
@@ -127,18 +127,43 @@ function mensaje(userId, contenido) {
     channel: {
       id: CANAL,
       async send(payload) {
-        const e = payload.embeds?.[0]?.data ?? {};
-        salida.push({
-          titulo: e.title,
-          desc: e.description,
-          campos: Object.fromEntries((e.fields ?? []).map((f) => [f.name, f.value])),
-        });
+        salida.push(leerPanel(payload));
       },
     },
     async react(emoji) {
       this.reacciones.push(String(emoji));
     },
     async delete() {},
+  };
+}
+
+/**
+ * Convierte un mensaje Components V2 en { titulo, desc, campos, v2, botones }.
+ * titulo = línea "### ...", campos = líneas "icono **Nombre:** valor".
+ */
+function leerPanel(payload) {
+  const textos = [];
+  const botones = [];
+  const recorrer = (c) => {
+    if (c.type === 10) textos.push(c.content);
+    if (c.type === 2) botones.push(c.custom_id);
+    for (const hijo of c.components ?? []) recorrer(hijo);
+  };
+  for (const c of payload.components ?? []) recorrer(c.toJSON ? c.toJSON() : c);
+
+  const lineas = textos.join('\n').split('\n');
+  const titulo = lineas.find((l) => l.startsWith('### '))?.slice(4);
+  const campos = {};
+  for (const l of lineas) {
+    const m = /^\S+ \*\*(.+?):\*\* (.+)$/.exec(l);
+    if (m) campos[m[1]] = m[2];
+  }
+  return {
+    titulo,
+    desc: lineas.join('\n'),
+    campos,
+    botones,
+    v2: Boolean(payload.flags & MessageFlags.IsComponentsV2) && !payload.embeds && !payload.content,
   };
 }
 
@@ -194,7 +219,13 @@ async function enviar(userId, texto) {
 
   console.log('\n=== turno repetido ===');
   r = await enviar('B', '3');
-  comprobar('mismo usuario dos veces = rompe', r.embeds[0]?.titulo === 'Cadena rota');
+  comprobar('mismo usuario dos veces = rompe', /Cadena rota/.test(r.embeds[0]?.titulo ?? ''));
+  comprobar('el aviso es un panel V2 (sin embeds)', r.embeds[0]?.v2 === true);
+  comprobar(
+    'el panel trae los botones',
+    r.embeds[0]?.botones.join('|') === 'mfc:nivel|mfc:top',
+    r.embeds[0]?.botones.join(', '),
+  );
   comprobar('mensaje explica el turno', /dos veces seguidas/.test(r.embeds[0]?.desc ?? ''));
   comprobar('contador reiniciado', store.getCanal(GUILD, CANAL).actual === 0);
   comprobar('hubo timeout', r.timeouts.length === 1, formatDuracion(r.timeouts[0]?.ms ?? 0));
