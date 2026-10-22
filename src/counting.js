@@ -2,11 +2,12 @@
 
 const { PermissionFlagsBits } = require('discord.js');
 const store = require('./store');
+const levels = require('./levels');
 const sanciones = require('./sanciones');
 const { calcularCastigo } = require('./timeouts');
-const { parseNumero, resolverEmoji } = require('./utils');
+const { parseNumero, formatDuracion, resolverEmoji } = require('./utils');
 const { leerNumero, pareceNumero } = require('./numeros');
-const { aviso } = require('./ui');
+const { Panel, boton, aviso } = require('./ui');
 const { DUENO_BOT } = require('./permisos');
 
 const COLOR_OK = 0x57f287;
@@ -136,6 +137,7 @@ async function manejarMensaje(message) {
   }
   historico.fallos++;
 
+  const llegoHasta = canal.actual;
   canal.actual = 0;
   canal.ultimoUsuario = null;
   canal.ultimoMensajeId = null;
@@ -143,25 +145,68 @@ async function manejarMensaje(message) {
   historicoCanal.fallos++;
   store.guardar();
 
-  // Sin mensaje en el canal: reacción si era un número, borrado si era charla,
-  // y a la vez el timeout
+  // Mientras se aplica el castigo: reacción si era un número, borrado si era charla
   const efecto = habladera
     ? cfg.borrarInvalidos && message.deletable
       ? message.delete().catch(() => {})
       : null
     : reaccionar(message, message.client, cfg.emojiFail, '❌');
 
-  if (cfg.timeoutsActivos && !exento) {
-    await silenciar(
-      message,
-      usuario,
-      castigo.ms,
-      habladera
-        ? `Escribió algo que no es un número en el contador (infracción #${castigo.infracciones})`
-        : `Rompió el contador en ${esperado} (infracción #${castigo.infracciones})`,
-    );
-  }
+  const resultado =
+    cfg.timeoutsActivos && !exento
+      ? await silenciar(
+          message,
+          usuario,
+          castigo.ms,
+          habladera
+            ? `Escribió algo que no es un número en el contador (infracción #${castigo.infracciones})`
+            : `Rompió el contador en ${esperado} (infracción #${castigo.infracciones})`,
+        )
+      : { ok: false };
   await efecto;
+
+  let subtitulo;
+  if (habladera) {
+    subtitulo = `**${message.author.username}** escribió algo que no es un número. **Aquí solo se cuenta.**`;
+  } else {
+    // Lo que escribió y lo que vale: `1+1` (= 2), o tal cual si estaba mal escrito
+    const texto = (leido?.texto ?? message.content).replace(/`/g, "'").slice(0, 40);
+    const enviado =
+      numero === null || texto === String(numero) ? `\`${texto}\`` : `\`${texto}\` (= ${numero})`;
+    subtitulo =
+      motivo === MOTIVO.TURNO
+        ? `**${message.author.username}** envió ${enviado} — **no puedes contar dos veces seguidas**`
+        : `**${message.author.username}** envió ${enviado} — se esperaba \`${esperado}\``;
+  }
+
+  const info = levels.calcular(canal.xp, cfg);
+  const panel = new Panel(COLOR_FAIL)
+    .cabecera('Cadena rota', {
+      subtitulo,
+      imagen: message.author.displayAvatarURL({ size: 128 }) || undefined,
+    })
+    .separador()
+    .campos([
+      ['Llegaron hasta', `\`${llegoHasta}\``],
+      ['Récord', `\`${canal.record}\``],
+      ['Timeout', resultado.ok ? `\`${formatDuracion(castigo.ms)}\`` : '`—`'],
+      [
+        'Infracciones',
+        exento
+          ? `\`${usuario.infracciones ?? 0}\``
+          : castigo.multiplicador > 1
+            ? `\`${castigo.infracciones}\` · castigo \`×${castigo.multiplicador}\``
+            : `\`${castigo.infracciones}\``,
+      ],
+      ['Nivel', `\`[${info.barra}] ${info.actual} / ${info.necesario}\``],
+    ])
+    .separador()
+    .botones(boton('mfc:nivel', 'Mi nivel'), boton('mfc:top', 'Top'))
+    .pie(`El contador vuelve a 1 · Respeta el turno · <t:${Math.floor(Date.now() / 1000)}:t>`);
+
+  try {
+    await message.channel.send(panel.mensaje());
+  } catch {}
 }
 
 /** Aviso cuando alguien borra el último número (para que nadie se pierda). */

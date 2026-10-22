@@ -84,7 +84,7 @@ El bot solo funciona en el servidor `1155074712402149437`. Si está en cualquier
 
 ## Reglas
 
-En el canal del contador el bot **no escribe mensajes**: solo reacciona (✔ si está bien, el emoji de fallo si se rompe) y borra lo que no son números.
+Cuando la cadena se rompe, el bot lo avisa en el canal. Cuando el canal sube de nivel no escribe nada: el nivel se ve en `/contador` y `/nivel`.
 
 1. Se cuenta de uno en uno.
 2. **No puedes contar dos veces seguidas** (se puede permitir con `permitirRepetir`).
@@ -243,7 +243,7 @@ La fórmula es `xpBase × (nivel+1) ^ xpExponente`. Sube `xpExponente` para hace
 | `borrarInvalidos` | `true` | Borrar los mensajes que no son números |
 | `timeoutHabladeraMin` | `60` | Castigo por escribir algo que no es un número |
 | `timeoutHabladeraMaxMin` | `1440` | Tope de ese castigo (24 h) |
-| `avisarBorrados` | `false` | Avisar en el canal si borran/editan el último número |
+| `avisarBorrados` | `true` | Avisar si borran/editan el último número |
 | `timeoutsActivos` | `true` | Aplicar timeouts |
 | `quitarSoloRolesAdmin` | `true` | Al castigar a un admin, quitarle solo los roles de admin |
 | `minutosPorNumero` | `0.1` | Minutos de castigo por cada número |
@@ -289,6 +289,7 @@ Todos los mensajes del bot usan **Components V2**, el sistema nuevo de Discord: 
 - `/contador`: botones Actualizar, Mi nivel, Top y Ayuda.
 - `/top`: menú para cambiar de ranking.
 - `/ayuda`: botones por sección y menú desplegable.
+- Cadena rota: botones Mi nivel y Top.
 
 Los botones piden el mismo permiso que su comando. Lo que abren desde un mensaje público sale como mensaje efímero, para no llenar el canal.
 

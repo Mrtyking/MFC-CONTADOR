@@ -253,7 +253,7 @@ async function enviar(userId, texto) {
   comprobar('"cuatro" cuenta como el 4', r.embeds.length === 0 && store.getCanal(GUILD, CANAL).actual === 4);
   r = await enviar('A', '2*3');
   comprobar('"2*3" (= 6) rompe cuando tocaba el 5', store.getCanal(GUILD, CANAL).actual === 0 && r.m.reacciones.includes('❌'));
-  comprobar('el bot no escribe en el canal', r.embeds.length === 0);
+  comprobar('sale el aviso de cadena rota con la cuenta', /`2\*3` \(= 6\)/.test(r.embeds[0]?.desc ?? ''));
   const c0 = store.getCanal(GUILD, CANAL);
   c0.actual = 2; // se deja como antes para la prueba del turno
   c0.ultimoUsuario = 'B';
@@ -262,7 +262,7 @@ async function enviar(userId, texto) {
   r = await enviar('B', '3');
   comprobar('mismo usuario dos veces = rompe', store.getCanal(GUILD, CANAL).actual === 0);
   comprobar('reacciona con el emoji de fallo', r.m.reacciones.includes('❌'), r.m.reacciones.join(' '));
-  comprobar('sin mensaje del bot', r.embeds.length === 0);
+  comprobar('sale el aviso de cadena rota', /Cadena rota/.test(r.embeds[0]?.titulo ?? '') && r.embeds[0]?.v2 === true);
   comprobar('hubo timeout', r.timeouts.length === 1, formatDuracion(r.timeouts[0]?.ms ?? 0));
 
   console.log('\n=== número equivocado (ejemplo del enunciado) ===');
@@ -277,7 +277,7 @@ async function enviar(userId, texto) {
   const min1 = (r.timeouts[0]?.ms ?? 0) / 60000;
   comprobar('C recibe timeout', r.timeouts.length === 1);
   comprobar('castigo suave: 1 min', min1 === 1, `${min1} min`);
-  comprobar('sin mensaje del bot', r.embeds.length === 0);
+  comprobar('sale el aviso de cadena rota', /Cadena rota/.test(r.embeds[0]?.titulo ?? '') && r.embeds[0]?.v2 === true);
 
   console.log('\n=== reincidencia (anti-spam) ===');
   const castigos = [];
@@ -314,7 +314,7 @@ async function enviar(userId, texto) {
     canal.ultimoUsuario = null;
     store.getUsuario(GUILD, 'HABLA').ultimaInfraccion = 0;
     r = await enviar('HABLA', texto);
-    comprobar(`"${texto}" rompe la cadena`, canal.actual === 0 && r.embeds.length === 0);
+    comprobar(`"${texto}" rompe la cadena`, canal.actual === 0 && /solo se cuenta/.test(r.embeds[0]?.desc ?? ''));
     comprobar(`"${texto}" se borra`, r.m.borrado === true);
     comprobar(`"${texto}" castigo fuerte: 1 hora`, r.timeouts[0]?.ms === 60 * 60000, formatDuracion(r.timeouts[0]?.ms ?? 0));
   }
@@ -324,6 +324,14 @@ async function enviar(userId, texto) {
   canal.ultimoUsuario = null;
   r = await enviar('SUAVE', '9');
   comprobar('equivocarse de número sigue siendo suave', r.timeouts[0]?.ms === 60000, formatDuracion(r.timeouts[0]?.ms ?? 0));
+
+  console.log('\n=== al subir de nivel no se manda nada ===');
+  canal.actual = 7;
+  canal.ultimoUsuario = null;
+  canal.xp = 19; // a 1 XP del nivel 1
+  r = await enviar('NIVEL', '8');
+  comprobar('sube de nivel', levels.calcular(canal.xp, store.getConfig(GUILD)).nivel === 1);
+  comprobar('sin mensaje de nivel en el canal', r.embeds.length === 0);
 
   console.log('\n=== números mal escritos: suave, no 1 hora ===');
   for (const texto of ['3a', '3/2', '5-9', '1234567890123456']) {
