@@ -140,7 +140,7 @@ async function castigar(member, ms, razon) {
 }
 
 /**
- * Devuelve los roles guardados. Se usa al vencer el castigo y desde /quitartimeout.
+ * Devuelve los roles guardados. Se usa al vencer el castigo y desde /perdon.
  * Devuelve { ok, roles, motivo }
  */
 async function devolver(guild, userId, motivo = 'castigo cumplido') {
@@ -272,7 +272,7 @@ function iniciar(client) {
   return i;
 }
 
-/** Info para mostrar en /nivel y /quitartimeout. */
+/** Info para mostrar en /nivel y /perdon. */
 function sancionDe(guildId, userId) {
   return pendientes(guildId)[userId] ?? null;
 }

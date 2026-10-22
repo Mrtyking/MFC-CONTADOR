@@ -71,14 +71,10 @@ Y ya. La gente escribe `1`, `2`, `3`… el bot reacciona con el check a cada aci
 | `/top [tipo]` | todos | Ranking de aciertos, mejor racha o fallos |
 | `/ayuda` | todos | Explica las reglas con los valores actuales |
 | `/setcanal [canal] [empezar_en]` | 🔒 | Define el canal del contador |
-| `/quitarcanal [canal] [borrar_datos]` | 🔒 | Deja de contar ahí |
 | `/reiniciar [numero]` | 🔒 | Reinicia el conteo |
-| `/quitartimeout <usuario>` | 🔒 | Quita el timeout y devuelve los roles retirados |
-| `/devolverroles <usuario>` | 🔒 | Devuelve los roles sin tocar el timeout |
-| `/perdon <usuario>` | 🔒 | Lo mismo + borra las infracciones acumuladas |
+| `/perdon <usuario> [borrar_infracciones]` | 🔒 | Quita el timeout, devuelve los roles retirados y (por defecto) borra las infracciones |
 | `/config ver \| poner \| reset` | 🔒 | Ajustes del servidor |
 | `/permisos ver \| rol \| comando` | 🔒 | Quién puede usar cada comando |
-| `/revisar [usuario]` | 🔒 | Comprueba permisos y jerarquía: por qué falla o no un castigo |
 
 🔒 = solo el rol con permiso y el dueño del bot. Ver [Permisos](#permisos).
 
@@ -140,7 +136,7 @@ Hay tres formas de que un castigo termine, y en las tres se devuelven los roles:
 | Cómo termina | Qué hace el bot |
 |---|---|
 | Se cumple el tiempo | Los devuelve solo |
-| `/quitartimeout @usuario` | Quita el timeout y los devuelve |
+| `/perdon @usuario` | Quita el timeout y los devuelve |
 | **Un mod quita el timeout a mano** desde Discord | Lo detecta y los devuelve solo |
 
 El tercer caso funciona de dos maneras a la vez: al instante si está activado **SERVER MEMBERS INTENT** en el portal, y como red de seguridad un repaso cada 30 segundos que funciona sin ningún intent. Si el intent está apagado el bot arranca igual y avisa por consola; solo tarda un poco más.
@@ -148,7 +144,7 @@ El tercer caso funciona de dos maneras a la vez: al instante si está activado *
 Y si aun así algo se queda colgado, a mano:
 
 ```
-/devolverroles @usuario
+/perdon @usuario
 ```
 
 ### Lo que no se puede hacer

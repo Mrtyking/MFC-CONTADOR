@@ -51,12 +51,6 @@ function calcular(xp, cfg) {
   };
 }
 
-/** Barra lista para un panel: `[▰▱▱▱▱▱▱▱▱▱] 1 / 20` */
-function texto(xp, cfg) {
-  const n = calcular(xp, cfg);
-  return `\`[${n.barra}] ${n.actual} / ${n.necesario}\``;
-}
-
 /** Devuelve el nivel nuevo si la XP añadida hizo subir de nivel, si no null. */
 function subioDeNivel(xpAntes, xpDespues, cfg) {
   const a = calcular(xpAntes, cfg).nivel;
@@ -64,4 +58,4 @@ function subioDeNivel(xpAntes, xpDespues, cfg) {
   return b > a ? b : null;
 }
 
-module.exports = { xpParaSubir, xpTotalHasta, calcular, texto, subioDeNivel };
+module.exports = { xpParaSubir, xpTotalHasta, calcular, subioDeNivel };

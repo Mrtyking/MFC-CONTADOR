@@ -43,15 +43,6 @@ const definiciones = [
     .setContexts(InteractionContextType.Guild),
 
   new SlashCommandBuilder()
-    .setName('quitarcanal')
-    .setDescription('Deja de contar en un canal')
-    .addChannelOption((o) => o.setName('canal').setDescription('Canal a quitar (por defecto, este)'))
-    .addBooleanOption((o) =>
-      o.setName('borrar_datos').setDescription('Borrar también récord, nivel y estadísticas'),
-    )
-    .setContexts(InteractionContextType.Guild),
-
-  new SlashCommandBuilder()
     .setName('contador')
     .setDescription('Muestra cómo va el contador y el nivel del canal')
     .setContexts(InteractionContextType.Guild),
@@ -86,21 +77,14 @@ const definiciones = [
     .setContexts(InteractionContextType.Guild),
 
   new SlashCommandBuilder()
-    .setName('quitartimeout')
-    .setDescription('Quita el timeout y le devuelve los roles que se le retiraron')
-    .addUserOption((o) => o.setName('usuario').setDescription('A quién').setRequired(true))
-    .setContexts(InteractionContextType.Guild),
-
-  new SlashCommandBuilder()
-    .setName('devolverroles')
-    .setDescription('Devuelve los roles que se le retiraron, sin tocar el timeout')
-    .addUserOption((o) => o.setName('usuario').setDescription('A quién').setRequired(true))
-    .setContexts(InteractionContextType.Guild),
-
-  new SlashCommandBuilder()
     .setName('perdon')
-    .setDescription('Quita el timeout, devuelve los roles y borra las infracciones acumuladas')
+    .setDescription('Quita el timeout y devuelve los roles retirados')
     .addUserOption((o) => o.setName('usuario').setDescription('A quién perdonar').setRequired(true))
+    .addBooleanOption((o) =>
+      o
+        .setName('borrar_infracciones')
+        .setDescription('Borrar también las infracciones acumuladas (por defecto sí)'),
+    )
     .setContexts(InteractionContextType.Guild),
 
   new SlashCommandBuilder()
@@ -164,14 +148,6 @@ const definiciones = [
         ),
     )
     .addSubcommand((s) => s.setName('reset').setDescription('Vuelve a los valores por defecto'))
-    .setContexts(InteractionContextType.Guild),
-
-  new SlashCommandBuilder()
-    .setName('revisar')
-    .setDescription('Comprueba si el bot puede castigar (permisos y jerarquía de roles)')
-    .addUserOption((o) =>
-      o.setName('usuario').setDescription('Comprobar si a esta persona se le puede castigar'),
-    )
     .setContexts(InteractionContextType.Guild),
 
   new SlashCommandBuilder()
@@ -425,8 +401,8 @@ function panelAyuda(guildId, seccion = 'inicio') {
 /* ------------------------------------------------------------------ */
 
 /**
- * Levanta el castigo: quita el timeout y devuelve los roles que se retiraron.
- * Lo comparten /quitartimeout y /perdon.
+ * Levanta el castigo de /perdon: quita el timeout, devuelve los roles que se
+ * retiraron y, si se pide, borra las infracciones acumuladas.
  */
 async function levantarCastigo(interaction, { borrarInfracciones }) {
   const objetivo = interaction.options.getUser('usuario');
@@ -541,36 +517,6 @@ const handlers = {
     await interaction.reply(panel.mensaje());
   },
 
-  async quitarcanal(interaction) {
-    const canalDiscord = interaction.options.getChannel('canal') ?? interaction.channel;
-    const borrar = interaction.options.getBoolean('borrar_datos') ?? false;
-    const g = store.getGuild(interaction.guild.id);
-
-    if (!g.canales[canalDiscord.id]) {
-      return interaction.reply(efimero(`${canalDiscord} no es un canal de conteo.`));
-    }
-
-    if (borrar) {
-      delete g.canales[canalDiscord.id];
-      if (g.archivo) delete g.archivo[canalDiscord.id];
-    } else {
-      // Se guarda a un lado: si vuelven a activar el canal, recuperan nivel y récord
-      if (!g.archivo) g.archivo = {};
-      g.archivo[canalDiscord.id] = g.canales[canalDiscord.id];
-      delete g.canales[canalDiscord.id];
-    }
-    store.guardar();
-
-    await interaction.reply(
-      aviso(
-        COLOR_INFO,
-        'Canal quitado',
-        `Ya no llevo el contador en ${canalDiscord}.` +
-          (borrar ? ' Datos borrados.' : ' Guardé el nivel y el récord por si lo reactivas.'),
-      ).mensaje(),
-    );
-  },
-
   async contador(interaction) {
     const panel = panelContador(interaction.guild.id, interaction.channel.id, interaction.client);
 
@@ -613,41 +559,9 @@ const handlers = {
     );
   },
 
-  async quitartimeout(interaction) {
-    await levantarCastigo(interaction, { borrarInfracciones: false });
-  },
-
   async perdon(interaction) {
-    await levantarCastigo(interaction, { borrarInfracciones: true });
-  },
-
-  async devolverroles(interaction) {
-    const objetivo = interaction.options.getUser('usuario');
-    const sancion = sanciones.sancionDe(interaction.guild.id, objetivo.id);
-
-    if (!sancion) {
-      return interaction.reply(
-        efimero(`<@${objetivo.id}> no tiene ningún rol retirado por mí.`),
-      );
-    }
-
-    const r = await sanciones.devolver(
-      interaction.guild,
-      objetivo.id,
-      `Devueltos a mano por ${interaction.user.tag}`,
-    );
-
-    await interaction.reply(
-      aviso(
-        r.ok ? COLOR_OK : COLOR_FAIL,
-        r.ok ? 'Roles devueltos' : 'No pude devolver los roles',
-        r.ok
-          ? `Roles devueltos a <@${objetivo.id}>: ${(sancion.nombres ?? [])
-              .map((n) => `\`${n}\``)
-              .join(', ')}\n-# Sigue con el timeout puesto, si lo tenía.`
-          : `No pude devolvérselos: ${r.motivo}`,
-      ).mensaje(),
-    );
+    const borrarInfracciones = interaction.options.getBoolean('borrar_infracciones') ?? true;
+    await levantarCastigo(interaction, { borrarInfracciones });
   },
 
   async permisos(interaction) {
@@ -798,68 +712,6 @@ const handlers = {
     await interaction.reply(
       efimero(`\`${clave}\` = \`${valor || '—'}\`  (antes: \`${DEFAULTS[clave] || '—'}\` por defecto)`),
     );
-  },
-
-  async revisar(interaction) {
-    const guild = interaction.guild;
-    const yo = guild.members.me;
-    const miPos = yo.roles.highest.position;
-
-    const check = (b) => (b ? '`Sí`' : '`No`');
-    const panel = new Panel(COLOR_INFO)
-      .cabecera('Revisión del bot',{ imagen: interaction.client.user.displayAvatarURL({ size: 128 }) })
-      .separador()
-      .texto(
-        [
-          '**Permisos**',
-          `${check(yo.permissions.has(PermissionFlagsBits.ModerateMembers))} Aislar miembros — dar timeouts`,
-          `${check(yo.permissions.has(PermissionFlagsBits.ManageRoles))} Gestionar roles — castigar administradores`,
-          `${check(yo.permissions.has(PermissionFlagsBits.AddReactions))} Añadir reacciones`,
-        ].join('\n'),
-      );
-
-    const porEncima = guild.roles.cache.filter(
-      (r) => r.position > miPos && !r.managed && r.id !== guild.id,
-    );
-    panel.separador().texto(
-      `**Jerarquía**\nMi rol está en la posición \`${miPos}\`.\n` +
-        (porEncima.size
-          ? `Hay **${porEncima.size} roles por encima del mío**. A quien tenga uno de esos no puedo tocarlo, ni siendo admin.\n\n**Arrastra mi rol arriba del todo** en Ajustes del servidor → Roles.`
-          : 'Mi rol está por encima de todos. Puedo castigar a cualquiera menos al dueño.'),
-    );
-
-    const objetivo = interaction.options.getUser('usuario');
-    if (objetivo) {
-      const member = await guild.members.fetch(objetivo.id).catch(() => null);
-      let veredicto;
-      if (!member) {
-        veredicto = '**No.** No está en el servidor.';
-      } else {
-        const impedimento = sanciones.bloqueo(member);
-        const esAdmin = member.permissions.has(PermissionFlagsBits.Administrator);
-        const suPos = member.roles.highest.position;
-
-        if (impedimento) {
-          veredicto = `**No.** ${impedimento[0].toUpperCase()}${impedimento.slice(1)}.`;
-          if (impedimento.includes('por encima')) {
-            veredicto += `\nSu rol está en \`${suPos}\` y el mío en \`${miPos}\`. Necesito estar por encima de \`${suPos}\`.`;
-          }
-        } else if (esAdmin) {
-          const soloAdmin = store.getConfig(guild.id).quitarSoloRolesAdmin !== false;
-          const quitables = sanciones.rolesQuitables(member, soloAdmin);
-          veredicto = quitables.size
-            ? `**Sí.** Es administrador, así que le quitaría ${quitables.size} rol(es) — ${quitables
-                .map((r) => `\`${r.name}\``)
-                .join(', ')} — aplicaría el timeout y se los devolvería al terminar. El resto de sus roles no se tocan.`
-            : '**No.** Es administrador y no tengo ningún rol suyo que pueda quitar.';
-        } else {
-          veredicto = '**Sí.** Timeout normal, sin tocarle los roles.';
-        }
-      }
-      panel.separador().cita(`**¿Puedo castigar a ${objetivo.username}?**\n${veredicto}`);
-    }
-
-    await interaction.reply(panel.mensaje({ efimero: true }));
   },
 
   async ayuda(interaction) {

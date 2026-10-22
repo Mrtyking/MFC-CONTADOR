@@ -25,14 +25,10 @@ const ADMIN = 'admin';
 const NIVELES = {
   // Administrativos
   setcanal: ADMIN,
-  quitarcanal: ADMIN,
   reiniciar: ADMIN,
   config: ADMIN,
   permisos: ADMIN,
   perdon: ADMIN,
-  quitartimeout: ADMIN,
-  devolverroles: ADMIN,
-  revisar: ADMIN,
   // Consulta
   contador: PUBLICO,
   nivel: PUBLICO,

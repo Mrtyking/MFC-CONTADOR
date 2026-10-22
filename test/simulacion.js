@@ -342,7 +342,7 @@ async function enviar(userId, texto) {
   await sanciones.castigar(admin3, 60 * 60 * 1000, 'prueba'); // 1 hora
   comprobar('castigado y sin rol de admin', !admin3.roles.cache.has('r_admin'));
 
-  // Un mod le quita el timeout desde la interfaz de Discord (no con /quitartimeout)
+  // Un mod le quita el timeout desde la interfaz de Discord (no con /perdon)
   const antes = { communicationDisabledUntilTimestamp: admin3.communicationDisabledUntilTimestamp };
   admin3.communicationDisabledUntilTimestamp = null;
 
@@ -452,7 +452,13 @@ async function enviar(userId, texto) {
   comprobar('/setcanal NO lo usa cualquiera', permisos.puede(cualquiera, 'setcanal').ok === false);
   comprobar('/config NO lo usa cualquiera', permisos.puede(cualquiera, 'config').ok === false);
   comprobar('/perdon NO lo usa cualquiera', permisos.puede(cualquiera, 'perdon').ok === false);
-  comprobar('/quitartimeout NO lo usa cualquiera', permisos.puede(cualquiera, 'quitartimeout').ok === false);
+  comprobar('/reiniciar NO lo usa cualquiera', permisos.puede(cualquiera, 'reiniciar').ok === false);
+  comprobar(
+    'solo quedan los 9 comandos',
+    Object.keys(permisos.NIVELES).sort().join(',') ===
+      'ayuda,config,contador,nivel,perdon,permisos,reiniciar,setcanal,top',
+    Object.keys(permisos.NIVELES).join(', '),
+  );
   comprobar('el rol configurado SÍ puede', permisos.puede(conRol, 'setcanal').ok === true);
   comprobar('el dueño del bot SÍ puede', permisos.puede(dueñoBot, 'config').ok === true);
 
