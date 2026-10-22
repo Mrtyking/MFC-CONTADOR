@@ -87,14 +87,26 @@ function tieneDatos(g) {
   );
 }
 
-/** Cuándo empieza la próxima temporada (precisión de 15 minutos). */
+/**
+ * Cuándo empieza la próxima temporada (precisión de 15 minutos).
+ * Se busca paso a paso, así que se guarda en caché hasta que llegue esa fecha:
+ * los paneles lo piden en cada /contador y /top.
+ */
+const cacheProximo = new Map();
 function proximoReinicio(cfg, desde = Date.now()) {
+  const clave = `${cfg.diaReinicio}|${cfg.zonaHoraria}`;
+  const guardado = cacheProximo.get(clave);
+  if (guardado && guardado.desde <= desde && desde < guardado.t) return guardado.t;
+
   const PASO = 15 * 60 * 1000;
   const actual = periodoDe(desde, cfg);
   let t = desde - (desde % PASO);
   for (let i = 0; i < 40 * 24 * 4; i++) {
     t += PASO;
-    if (periodoDe(t, cfg) !== actual) return t;
+    if (periodoDe(t, cfg) !== actual) {
+      cacheProximo.set(clave, { desde, t });
+      return t;
+    }
   }
   return null;
 }
@@ -114,6 +126,7 @@ function nombrePeriodo(periodo, cfg) {
   return `${cfg.diaReinicio} de ${NOMBRES_MES[m - 1]} – ${finDia} de ${NOMBRES_MES[finMes - 1]} de ${finAnio}`;
 }
 
+/** Ranking de un campo de los usuarios. Lo usan /top y el resumen de la temporada. */
 function top(usuarios, campo, n = 10) {
   return Object.entries(usuarios)
     .map(([id, u]) => ({ id, valor: u[campo] ?? 0 }))
@@ -266,4 +279,5 @@ module.exports = {
   proximoReinicio,
   nombrePeriodo,
   zonaValida,
+  top,
 };

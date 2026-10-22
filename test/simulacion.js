@@ -286,6 +286,14 @@ async function enviar(userId, texto) {
   });
   comprobar('nunca pasa de 1 hora', peor.minutos === 60, formatDuracion(peor.ms));
 
+  console.log('\n=== si el timeout no se aplica, no se cuenta ===');
+  miembro(DUENO, { roles: ['r_admin'] }); // al dueño no se le puede castigar
+  const silenciadoAntes = store.getUsuario(GUILD, DUENO).totalTimeoutMs;
+  r = await enviar(DUENO, '999');
+  comprobar('la cadena se rompe igual', /Cadena rota/.test(r.embeds[0]?.titulo ?? ''));
+  comprobar('no se le suma tiempo silenciado', store.getUsuario(GUILD, DUENO).totalTimeoutMs === silenciadoAntes);
+  comprobar('el panel dice que no hubo timeout', r.embeds[0]?.campos.Timeout === '`—`');
+
   console.log('\n=== la ventana anti-spam expira ===');
   const cfg2 = store.getConfig(GUILD);
   const usuarioViejo = {

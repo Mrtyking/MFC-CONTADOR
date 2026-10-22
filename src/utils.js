@@ -62,6 +62,4 @@ function resolverEmoji(client, valor) {
   return valor; // emoji unicode normal
 }
 
-const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
-
-module.exports = { parseNumero, barra, formatDuracion, tsRelativo, resolverEmoji, dormir };
+module.exports = { parseNumero, barra, formatDuracion, tsRelativo, resolverEmoji };

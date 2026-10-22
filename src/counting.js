@@ -80,23 +80,25 @@ async function manejarMensaje(message) {
     store.guardar();
 
     // --- Efectos asíncronos ---
-    await reaccionar(message, message.client, cfg.emojiOk, '✅');
-
-    if (cfg.celebrarHitos && numero % 100 === 0) {
-      await reaccionar(message, message.client, cfg.emojiHito, null);
-    }
+    // Las reacciones van en orden (check y luego hito), pero a la vez que el
+    // aviso de nivel, para que el canal responda rápido.
+    const reacciones = reaccionar(message, message.client, cfg.emojiOk, '✅').then(() =>
+      cfg.celebrarHitos && numero % 100 === 0
+        ? reaccionar(message, message.client, cfg.emojiHito, null)
+        : null,
+    );
 
     const nivelNuevo = levels.subioDeNivel(xpAntes, canal.xp, cfg);
+    let aviso = null;
     if (nivelNuevo) {
       const info = levels.calcular(canal.xp, cfg);
       const panel = new Panel(COLOR_OK)
         .cabecera('¡Nivel alcanzado!', { subtitulo: `El canal subió al **nivel ${nivelNuevo}**.` })
         .separador()
         .cita(`\`[${info.barra}] ${info.actual} / ${info.necesario}\``);
-      try {
-        await message.channel.send(panel.mensaje());
-      } catch {}
+      aviso = message.channel.send(panel.mensaje()).catch(() => {});
     }
+    await Promise.all([reacciones, aviso]);
     return;
   }
 
@@ -113,10 +115,6 @@ async function manejarMensaje(message) {
   usuario.infracciones = castigo.infracciones;
   usuario.ultimaInfraccion = Date.now();
   historico.fallos++;
-  if (cfg.timeoutsActivos) {
-    usuario.totalTimeoutMs += castigo.ms;
-    historico.totalTimeoutMs += castigo.ms;
-  }
 
   canal.actual = 0;
   canal.ultimoUsuario = null;
@@ -125,7 +123,8 @@ async function manejarMensaje(message) {
   historicoCanal.fallos++;
   store.guardar();
 
-  await reaccionar(message, message.client, cfg.emojiFail, '❌');
+  // La reacción sale mientras se aplica el castigo
+  const reaccion = reaccionar(message, message.client, cfg.emojiFail, '❌');
 
   // Timeout (si es admin, sanciones se encarga de quitarle los roles primero)
   let resultado = { ok: false, motivo: 'los timeouts están desactivados', metodo: null, roles: [] };
@@ -144,6 +143,14 @@ async function manejarMensaje(message) {
         : { ok: false, motivo: 'ya no está en el servidor', metodo: null, roles: [] };
     }
   }
+
+  // Solo cuenta como tiempo silenciado si el timeout se aplicó de verdad
+  if (resultado.ok) {
+    usuario.totalTimeoutMs += castigo.ms;
+    historico.totalTimeoutMs += castigo.ms;
+    store.guardar();
+  }
+  await reaccion;
 
   // Lo técnico va a la consola, no al canal: el embed es para los usuarios y
   // solo tiene que decir que la cadena se rompió y cuánto dura el castigo.

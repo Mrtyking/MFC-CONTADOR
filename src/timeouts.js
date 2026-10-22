@@ -44,20 +44,5 @@ function calcularCastigo({ numeroArruinado, usuario, cfg, ahora = Date.now() }) 
   };
 }
 
-/**
- * Aplica el timeout. Devuelve { ok, motivo } — nunca lanza.
- */
-async function aplicar(member, ms, razon) {
-  if (!member) return { ok: false, motivo: 'El usuario ya no está en el servidor' };
-  if (!member.moderatable) {
-    return { ok: false, motivo: 'No puedo silenciar a este usuario (rol más alto o admin)' };
-  }
-  try {
-    await member.timeout(Math.min(ms, MAX_DISCORD_MS), razon);
-    return { ok: true };
-  } catch (err) {
-    return { ok: false, motivo: err?.message ?? 'Error desconocido' };
-  }
-}
-
-module.exports = { calcularCastigo, aplicar, MAX_DISCORD_MS };
+// El timeout en sí lo aplica sanciones.castigar(), que también sabe castigar a admins.
+module.exports = { calcularCastigo, MAX_DISCORD_MS };

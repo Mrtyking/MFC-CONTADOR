@@ -95,36 +95,21 @@ client.once(Events.ClientReady, async (c) => {
 client.on(Events.GuildCreate, (guild) => registrarEn(guild));
 
 client.on(Events.InteractionCreate, async (interaction) => {
-  // Botones y menús de los paneles: piden el mismo permiso que su comando
-  if ((interaction.isButton() || interaction.isStringSelectMenu()) && interaction.inGuild()) {
-    const comando = comandoDe(interaction.customId);
-    if (!comando) return;
+  if (!interaction.inGuild()) return;
 
-    const permiso = permisos.puede(interaction, comando);
-    if (!permiso.ok) {
-      return interaction
-        .reply({ content: permiso.motivo, flags: MessageFlags.Ephemeral })
-        .catch(() => {});
-    }
-
-    try {
-      await manejarComponente(interaction);
-    } catch (err) {
-      console.error(`[botón ${interaction.customId}]`, err);
-      const aviso = { content: 'Ups, algo falló con ese botón.', flags: MessageFlags.Ephemeral };
-      try {
-        if (interaction.deferred || interaction.replied) await interaction.followUp(aviso);
-        else await interaction.reply(aviso);
-      } catch {}
-    }
-    return;
+  // Slash commands, y botones/menús de los paneles con el permiso de su comando
+  let comando;
+  let ejecutar;
+  if (interaction.isChatInputCommand()) {
+    comando = interaction.commandName;
+    ejecutar = handlers[comando];
+  } else if (interaction.isButton() || interaction.isStringSelectMenu()) {
+    comando = comandoDe(interaction.customId);
+    ejecutar = comando ? manejarComponente : null;
   }
+  if (!ejecutar) return;
 
-  if (!interaction.isChatInputCommand()) return;
-  const handler = handlers[interaction.commandName];
-  if (!handler) return;
-
-  const permiso = permisos.puede(interaction, interaction.commandName);
+  const permiso = permisos.puede(interaction, comando);
   if (!permiso.ok) {
     return interaction
       .reply({ content: permiso.motivo, flags: MessageFlags.Ephemeral })
@@ -132,10 +117,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 
   try {
-    await handler(interaction);
+    await ejecutar(interaction);
   } catch (err) {
-    console.error(`[comando ${interaction.commandName}]`, err);
-    const aviso = { content: 'Ups, algo falló ejecutando ese comando.', flags: MessageFlags.Ephemeral };
+    console.error(`[${interaction.isChatInputCommand() ? 'comando' : 'botón'} ${comando}]`, err);
+    const aviso = { content: 'Ups, algo falló. Prueba otra vez.', flags: MessageFlags.Ephemeral };
     try {
       if (interaction.deferred || interaction.replied) await interaction.followUp(aviso);
       else await interaction.reply(aviso);

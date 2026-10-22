@@ -268,12 +268,7 @@ function panelNivel(guildId, canalId, objetivo) {
 
 function panelTop(guildId, tipo) {
   const cfg = store.getConfig(guildId);
-  const g = store.getGuild(guildId);
-  const lista = Object.entries(g.usuarios)
-    .map(([id, u]) => ({ id, valor: u[tipo] ?? 0 }))
-    .filter((x) => x.valor > 0)
-    .sort((a, b) => b.valor - a.valor)
-    .slice(0, 10);
+  const lista = temporadas.top(store.getGuild(guildId).usuarios, tipo);
 
   const texto = lista.length
     ? lista
@@ -410,6 +405,9 @@ async function levantarCastigo(interaction, { borrarInfracciones }) {
   const razon = `Levantado por ${interaction.user.tag}`;
   const lineas = [];
 
+  // Son varias llamadas a Discord y pueden pasar de los 3 s que da para responder
+  await interaction.deferReply();
+
   const member = await guild.members.fetch(objetivo.id).catch(() => null);
 
   // 1. Quitar el timeout
@@ -452,7 +450,7 @@ async function levantarCastigo(interaction, { borrarInfracciones }) {
   }
 
   const fallo = lineas.some((l) => l.includes('No pude'));
-  await interaction.reply(
+  await interaction.editReply(
     new Panel(fallo ? COLOR_FAIL : COLOR_OK)
       .cabecera(borrarInfracciones ? 'Perdonado' : 'Timeout retirado', {
         subtitulo: `<@${objetivo.id}>`,
@@ -471,12 +469,12 @@ const handlers = {
     const cfg = store.getConfig(interaction.guild.id);
 
     const yo = interaction.guild.members.me;
-    const permisos = canalDiscord.permissionsFor(yo);
+    const enCanal = canalDiscord.permissionsFor(yo);
     const faltan = [];
-    if (!permisos?.has(PermissionFlagsBits.ViewChannel)) faltan.push('Ver canal');
-    if (!permisos?.has(PermissionFlagsBits.SendMessages)) faltan.push('Enviar mensajes');
-    if (!permisos?.has(PermissionFlagsBits.AddReactions)) faltan.push('Añadir reacciones');
-    if (!permisos?.has(PermissionFlagsBits.ReadMessageHistory)) faltan.push('Leer historial');
+    if (!enCanal?.has(PermissionFlagsBits.ViewChannel)) faltan.push('Ver canal');
+    if (!enCanal?.has(PermissionFlagsBits.SendMessages)) faltan.push('Enviar mensajes');
+    if (!enCanal?.has(PermissionFlagsBits.AddReactions)) faltan.push('Añadir reacciones');
+    if (!enCanal?.has(PermissionFlagsBits.ReadMessageHistory)) faltan.push('Leer historial');
 
     const g = store.getGuild(interaction.guild.id);
     const nuevo = !g.canales[canalDiscord.id];
