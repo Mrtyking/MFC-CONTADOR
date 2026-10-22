@@ -10,6 +10,7 @@ const {
   MessageFlags,
   PermissionFlagsBits,
   IntentsBitField,
+  ActivityType,
 } = require('discord.js');
 const store = require('./store');
 const permisos = require('./permisos');
@@ -39,6 +40,10 @@ const client = new Client({
   intents: [...INTENTS_BASE, GatewayIntentBits.GuildMembers],
   partials: [Partials.Message, Partials.Channel, Partials.GuildMember],
 });
+
+/** Textos del estado del bot; se van turnando cada CAMBIO_ESTADO_MS. */
+const ESTADOS = ['https://mafiachinactr.com/', '𝐠𝐠.𝖒𝖆𝖋𝖎𝖆𝖈𝖍𝖎𝖓𝖆𝖈𝖙𝖗'];
+const CAMBIO_ESTADO_MS = 15 * 1000;
 
 /** Permisos que necesita el bot para funcionar entero. */
 const PERMISOS = [
@@ -70,7 +75,17 @@ client.once(Events.ClientReady, async (c) => {
     `Invitación: https://discord.com/api/oauth2/authorize?client_id=${c.user.id}&permissions=${PERMISOS}&scope=bot%20applications.commands`,
   );
 
-  c.user.setActivity('el contador · /ayuda');
+  // Estado personalizado que va alternando entre los textos de ESTADOS
+  let turno = 0;
+  const ponerEstado = () => {
+    c.user.setPresence({
+      activities: [{ type: ActivityType.Custom, name: 'estado', state: ESTADOS[turno % ESTADOS.length] }],
+      status: 'online',
+    });
+    turno++;
+  };
+  ponerEstado();
+  setInterval(ponerEstado, CAMBIO_ESTADO_MS).unref();
 
   for (const guild of c.guilds.cache.values()) {
     await registrarEn(guild);
