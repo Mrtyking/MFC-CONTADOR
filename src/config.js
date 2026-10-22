@@ -37,6 +37,14 @@ const DEFAULTS = {
   xpExponente: 1.25, // cuánto se encarece cada nivel siguiente
   segmentosBarra: 10, // ▱▱▱▱▱▱▱▱▱▱
 
+  // --- Temporadas ---
+  // Cada mes, ese día a las 00:00, se archiva el mes y se borran el top, las
+  // estadísticas de los usuarios y el nivel del canal. El número del contador
+  // y el récord no se tocan.
+  reinicioMensual: true,
+  diaReinicio: 20,
+  zonaHoraria: '', // p. ej. America/Santo_Domingo ('' = la hora del equipo donde corre el bot)
+
   // --- Apariencia ---
   banner: '', // URL de una imagen o GIF grande arriba de /contador y /ayuda ('' = sin banner)
 };
@@ -60,6 +68,9 @@ const ESQUEMA = {
   xpPorAcierto: { tipo: 'num', min: 0, max: 100 },
   xpBase: { tipo: 'num', min: 1, max: 10000 },
   xpExponente: { tipo: 'num', min: 1, max: 3 },
+  reinicioMensual: { tipo: 'bool' },
+  diaReinicio: { tipo: 'num', min: 1, max: 28 },
+  zonaHoraria: { tipo: 'zona' },
   banner: { tipo: 'url' },
 };
 

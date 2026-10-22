@@ -14,6 +14,7 @@ const {
 const store = require('./store');
 const permisos = require('./permisos');
 const sanciones = require('./sanciones');
+const temporadas = require('./temporadas');
 const { definiciones, handlers, comandoDe, manejarComponente } = require('./commands');
 const { manejarMensaje, manejarBorrado, manejarEdicion } = require('./counting');
 
@@ -77,6 +78,9 @@ client.once(Events.ClientReady, async (c) => {
 
   // Devuelve los roles de los castigos que vencieron mientras el bot estaba apagado
   sanciones.iniciar(c);
+
+  // Reinicio mensual de estadísticas (por defecto el día 20)
+  temporadas.iniciar(c);
 
   for (const guild of c.guilds.cache.values()) {
     const g = store.getGuild(guild.id);

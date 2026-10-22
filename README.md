@@ -235,6 +235,9 @@ La fórmula es `xpBase × (nivel+1) ^ xpExponente`. Sube `xpExponente` para hace
 | `xpPorAcierto` | `1` | XP por número correcto |
 | `xpBase` | `20` | Coste base de nivel |
 | `xpExponente` | `1.25` | Cuánto se encarece cada nivel |
+| `reinicioMensual` | `true` | Reiniciar las estadísticas cada mes |
+| `diaReinicio` | `20` | Día del mes en que empieza la temporada nueva (1-28) |
+| `zonaHoraria` | — | Zona para la medianoche del reinicio, p. ej. `America/Santo_Domingo` (vacío = la hora del equipo del bot) |
 | `banner` | — | URL de una imagen o GIF que sale arriba de `/contador` y `/ayuda` (`no` para quitarlo) |
 
 Ejemplos:
@@ -245,6 +248,19 @@ Ejemplos:
 /config poner ajuste:xpExponente valor:1.5
 /config poner ajuste:banner valor:https://.../banner.gif
 ```
+
+### Temporadas mensuales
+
+El día `diaReinicio` de cada mes (por defecto el **20**) a las 00:00 empieza una temporada nueva:
+
+- **Se borran:** el top, las estadísticas de cada usuario (aciertos, fallos, rachas, tiempo silenciado) y el nivel del canal.
+- **No se tocan:** el número por el que va el contador, el récord, el **histórico** de cada usuario (sale en `/nivel`), las infracciones y los castigos en curso.
+- Antes de borrar se hace una copia completa en `data/guilds.antes-temporada-AAAA-MM.json` y se guarda un resumen con el top 10 en los datos del servidor (últimas 12 temporadas).
+- El bot lo anuncia en los canales de conteo con los ganadores del mes.
+
+Si el bot estaba apagado ese día, el reinicio se hace en cuanto arranca. La primera vez que se arranca esta versión, si ya había estadísticas de antes del último día 20, se cierran en ese momento.
+
+Los niveles no tienen tope, y la barra empieza de cero en cada nivel: `[▰▱▱▱▱▱▱▱▱▱] 1 / 20`.
 
 ### Mensajes (Components V2)
 

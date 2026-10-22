@@ -59,6 +59,8 @@ async function manejarMensaje(message) {
   // --- Mutación de estado SÍNCRONA (antes de cualquier await) ---
   // Así dos mensajes casi simultáneos no pueden pisarse entre sí.
   const usuario = store.getUsuario(message.guild.id, message.author.id);
+  const historico = store.historico(usuario);
+  const historicoCanal = store.historicoCanal(canal);
 
   if (!motivo) {
     const xpAntes = canal.xp;
@@ -68,10 +70,13 @@ async function manejarMensaje(message) {
     canal.totalAciertos++;
     canal.xp += cfg.xpPorAcierto;
     if (numero > canal.record) canal.record = numero;
+    historicoCanal.aciertos++;
 
     usuario.aciertos++;
     usuario.rachaActual++;
     if (usuario.rachaActual > usuario.mejorRacha) usuario.mejorRacha = usuario.rachaActual;
+    historico.aciertos++;
+    if (usuario.rachaActual > historico.mejorRacha) historico.mejorRacha = usuario.rachaActual;
     store.guardar();
 
     // --- Efectos asíncronos ---
@@ -87,7 +92,7 @@ async function manejarMensaje(message) {
       const panel = new Panel(COLOR_OK)
         .cabecera('¡Nivel alcanzado!', { subtitulo: `El canal subió al **nivel ${nivelNuevo}**.` })
         .separador()
-        .cita(`\`[${info.barra}] ${info.xp} / ${info.siguiente}\``);
+        .cita(`\`[${info.barra}] ${info.actual} / ${info.necesario}\``);
       try {
         await message.channel.send(panel.mensaje());
       } catch {}
@@ -107,12 +112,17 @@ async function manejarMensaje(message) {
   usuario.rachaActual = 0;
   usuario.infracciones = castigo.infracciones;
   usuario.ultimaInfraccion = Date.now();
-  if (cfg.timeoutsActivos) usuario.totalTimeoutMs += castigo.ms;
+  historico.fallos++;
+  if (cfg.timeoutsActivos) {
+    usuario.totalTimeoutMs += castigo.ms;
+    historico.totalTimeoutMs += castigo.ms;
+  }
 
   canal.actual = 0;
   canal.ultimoUsuario = null;
   canal.ultimoMensajeId = null;
   canal.totalFallos++;
+  historicoCanal.fallos++;
   store.guardar();
 
   await reaccionar(message, message.client, cfg.emojiFail, '❌');
@@ -169,7 +179,7 @@ async function manejarMensaje(message) {
           ? `\`${castigo.infracciones}\` · castigo \`×${castigo.multiplicador}\``
           : `\`${castigo.infracciones}\``,
       ],
-      ['Nivel', `\`[${info.barra}] ${info.xp} / ${info.siguiente}\``],
+      ['Nivel', `\`[${info.barra}] ${info.actual} / ${info.necesario}\``],
     ])
     .separador()
     .botones(boton('mfc:nivel', 'Mi nivel'), boton('mfc:top', 'Top'))

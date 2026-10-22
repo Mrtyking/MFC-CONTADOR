@@ -378,6 +378,48 @@ async function enviar(userId, texto) {
   comprobar('a quien esté por encima del bot tampoco', r2.ok === false, r2.motivo);
   comprobar('y no le quitó ningún rol', jefe.roles.cache.has('r_intocable'));
 
+  console.log('\n=== niveles sin tope y barra por nivel ===');
+  const enNivel1 = levels.calcular(21, cfg);
+  comprobar('21 XP = nivel 1 con 1 / 48', enNivel1.nivel === 1 && enNivel1.actual === 1 && enNivel1.necesario === 48,
+    `[${enNivel1.barra}] ${enNivel1.actual} / ${enNivel1.necesario}`);
+  comprobar('la barra empieza de cero en cada nivel', enNivel1.barra === '▰▱▱▱▱▱▱▱▱▱');
+  const enorme = levels.calcular(levels.xpTotalHasta(20000, cfg), cfg);
+  comprobar('sin tope de nivel (antes paraba en 10000)', enorme.nivel === 20000, `nivel ${enorme.nivel}`);
+
+  console.log('\n=== temporadas (reinicio el día 20) ===');
+  const temporadas = require('../src/temporadas');
+  const cfgT = { ...store.getConfig(GUILD), zonaHoraria: 'UTC' };
+  const dia = (s) => Date.parse(`${s}T12:00:00Z`);
+  comprobar('19 oct es de la temporada de septiembre', temporadas.periodoDe(dia('2026-10-19'), cfgT) === '2026-09');
+  comprobar('20 oct empieza la de octubre', temporadas.periodoDe(dia('2026-10-20'), cfgT) === '2026-10');
+  comprobar('5 ene es de la de diciembre', temporadas.periodoDe(dia('2027-01-05'), cfgT) === '2026-12');
+  const prox = temporadas.proximoReinicio(cfgT, dia('2026-10-22'));
+  comprobar('próximo reinicio el 20 nov', new Date(prox).toISOString() === '2026-11-20T00:00:00.000Z', new Date(prox).toISOString());
+
+  const gT = store.getGuild(GUILD);
+  gT.config.zonaHoraria = 'UTC';
+  delete gT.periodo;
+  const canalT = store.getCanal(GUILD, CANAL);
+  canalT.actual = 37;
+  const recordAntes = canalT.record;
+  const uA = store.getUsuario(GUILD, 'A');
+  const aciertosHistAntes = uA.historico.aciertos;
+  comprobar('hay estadísticas antes del reinicio', uA.aciertos > 0 && canalT.xp > 0);
+
+  // El bot arranca el 22 de octubre con datos de antes: cierra la temporada ya
+  const cerrada = temporadas.cerrarSiToca(GUILD, dia('2026-10-22'));
+  comprobar('al arrancar después del 20, cierra la temporada anterior', cerrada?.periodo === '2026-09');
+  comprobar('el top quedó archivado', cerrada?.top.aciertos.length > 0);
+  comprobar('aciertos del mes a 0', uA.aciertos === 0 && uA.fallos === 0 && uA.mejorRacha === 0);
+  comprobar('nivel del canal a 0', canalT.xp === 0 && levels.calcular(canalT.xp, cfgT).nivel === 0);
+  comprobar('el contador sigue donde iba', canalT.actual === 37);
+  comprobar('el récord se conserva', canalT.record === recordAntes);
+  comprobar('el histórico se conserva', uA.historico.aciertos === aciertosHistAntes, `${uA.historico.aciertos}`);
+  comprobar('el mismo mes no vuelve a reiniciar', temporadas.cerrarSiToca(GUILD, dia('2026-11-19')) === null);
+  comprobar('el 20 nov sí', temporadas.cerrarSiToca(GUILD, dia('2026-11-20'))?.periodo === '2026-10');
+  comprobar('quedan guardadas las temporadas', gT.temporadas.length === 2);
+  delete gT.config.zonaHoraria;
+
   console.log('\n=== persistencia al reiniciar ===');
   const canalAntes = store.getCanal(GUILD, CANAL);
   const snapshot = { actual: canalAntes.actual, record: canalAntes.record, xp: canalAntes.xp };

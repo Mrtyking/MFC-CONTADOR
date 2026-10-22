@@ -16,6 +16,7 @@ const { COLOR_OK, COLOR_FAIL, COLOR_INFO } = require('./counting');
 const permisos = require('./permisos');
 const sanciones = require('./sanciones');
 const { Panel, boton, desplegable, aviso } = require('./ui');
+const temporadas = require('./temporadas');
 
 const efimero = (contenido) => ({ content: contenido, flags: MessageFlags.Ephemeral });
 
@@ -220,10 +221,17 @@ function panelContador(guildId, canalId, client) {
     ])
     .separador()
     .cita(
-      `**Nivel ${info.nivel}**\n\`[${info.barra}] ${info.xp} / ${info.siguiente}\` · faltan \`${info.faltan}\``,
+      `**Nivel ${info.nivel}**\n\`[${info.barra}] ${info.actual} / ${info.necesario}\` · faltan \`${info.faltan}\``,
     )
     .botones(boton('mfc:contador:actualizar', 'Actualizar'), ...botonesConsulta())
-    .pie(`${PIE} · Actualizado ${tsRelativo(Date.now())}`);
+    .pie(`${PIE} · ${textoTemporada(cfg)} · Actualizado ${tsRelativo(Date.now())}`);
+}
+
+/** "Temporada hasta <fecha>" para los pies de los paneles. */
+function textoTemporada(cfg) {
+  if (!cfg.reinicioMensual) return 'Sin reinicio mensual';
+  const proximo = temporadas.proximoReinicio(cfg);
+  return proximo ? `Se reinicia ${tsRelativo(proximo)}` : `Se reinicia el ${cfg.diaReinicio} de cada mes`;
 }
 
 function panelNivel(guildId, canalId, objetivo) {
@@ -239,7 +247,7 @@ function panelNivel(guildId, canalId, objetivo) {
 
   if (canal) {
     const info = levels.calcular(canal.xp, cfg);
-    panel.cita(`**Nivel del canal — ${info.nivel}**\n\`[${info.barra}] ${info.xp} / ${info.siguiente}\``);
+    panel.cita(`**Nivel del canal — ${info.nivel}**\n\`[${info.barra}] ${info.actual} / ${info.necesario}\``);
   }
 
   panel.separador();
@@ -262,6 +270,13 @@ function panelNivel(guildId, canalId, objetivo) {
     ['Tiempo silenciado', `\`${formatDuracion(u.totalTimeoutMs)}\``],
   ]);
 
+  const h = store.historico(u);
+  panel
+    .separador()
+    .cita(
+      `**Histórico** (no se borra cada mes)\nAciertos \`${h.aciertos}\` · Fallos \`${h.fallos}\` · Mejor racha \`${h.mejorRacha}\` · Silenciado \`${formatDuracion(h.totalTimeoutMs)}\``,
+    );
+
   const sancion = sanciones.sancionDe(guildId, objetivo.id);
   if (sancion) {
     panel.separador().cita(
@@ -272,10 +287,11 @@ function panelNivel(guildId, canalId, objetivo) {
     );
   }
 
-  return panel.pie(PIE);
+  return panel.pie(`${PIE} · Temporada actual · ${textoTemporada(cfg)}`);
 }
 
 function panelTop(guildId, tipo) {
+  const cfg = store.getConfig(guildId);
   const g = store.getGuild(guildId);
   const lista = Object.entries(g.usuarios)
     .map(([id, u]) => ({ id, valor: u[tipo] ?? 0 }))
@@ -291,7 +307,7 @@ function panelTop(guildId, tipo) {
 
   return new Panel(COLOR_INFO)
     .cabecera(`Top ${TOPS[tipo].label}`)
-    .cita('Los 10 mejores del servidor. Cambia de ranking en el menú.')
+    .cita('Los 10 mejores de la temporada. Cambia de ranking en el menú.')
     .separador()
     .texto(texto)
     .separador()
@@ -303,7 +319,7 @@ function panelTop(guildId, tipo) {
         tipo,
       ),
     )
-    .pie(PIE);
+    .pie(`${PIE} · ${textoTemporada(cfg)}`);
 }
 
 /** Secciones de /ayuda. Cada una sale con su botón y en el menú. */
@@ -331,7 +347,11 @@ function contenidoAyuda(guildId, seccion) {
     case 'niveles':
       return `Cada acierto da ${cfg.xpPorAcierto} XP al canal. Cada nivel cuesta más que el anterior:\n\n${[0, 1, 2, 3, 4]
         .map((n) => `\`nivel ${n} → ${n + 1}\` ${levels.xpParaSubir(n, cfg)} XP`)
-        .join('\n')}`;
+        .join('\n')}\n\nLos niveles no tienen tope.${
+        cfg.reinicioMensual
+          ? ` El día ${cfg.diaReinicio} de cada mes empieza una temporada nueva: el nivel, el top y las estadísticas vuelven a cero (el contador sigue donde iba). Tu histórico no se borra.`
+          : ''
+      }`;
     case 'admins':
       return 'No. Discord ignora el timeout de los administradores, así que el bot les quita los roles primero, aplica el castigo y **se los devuelve solo** cuando termina.\n\nAl dueño del servidor no se le puede tocar (eso es límite de Discord).';
     case 'comandos':
@@ -749,6 +769,13 @@ const handlers = {
       if (valor < esquema.min || valor > esquema.max) {
         return interaction.reply(
           efimero(`\`${clave}\` tiene que estar entre ${esquema.min} y ${esquema.max}.`),
+        );
+      }
+    } else if (esquema.tipo === 'zona') {
+      valor = ['no', 'ninguna', '-', 'local'].includes(bruto.toLowerCase()) ? '' : bruto;
+      if (!temporadas.zonaValida(valor)) {
+        return interaction.reply(
+          efimero(`\`${bruto}\` no es una zona horaria válida. Ejemplos: \`America/Santo_Domingo\`, \`Europe/Madrid\`.`),
         );
       }
     } else if (esquema.tipo === 'url') {

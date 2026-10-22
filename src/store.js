@@ -99,7 +99,57 @@ function getUsuario(guildId, userId) {
     };
     g.usuarios[userId] = u;
   }
+  historico(u);
   return u;
 }
 
-module.exports = { cargar, guardar, guardarAhora, getGuild, getConfig, getCanal, getUsuario, db: () => db };
+/**
+ * Totales de siempre de un usuario: no se borran con el reinicio mensual.
+ * Los usuarios de antes de existir el histórico arrancan con lo que ya tenían.
+ */
+function historico(u) {
+  if (!u.historico) {
+    u.historico = {
+      aciertos: u.aciertos ?? 0,
+      fallos: u.fallos ?? 0,
+      mejorRacha: u.mejorRacha ?? 0,
+      totalTimeoutMs: u.totalTimeoutMs ?? 0,
+    };
+  }
+  return u.historico;
+}
+
+/** Igual que historico() pero para un canal: aciertos y cadenas rotas de siempre. */
+function historicoCanal(canal) {
+  if (!canal.historico) {
+    canal.historico = { aciertos: canal.totalAciertos ?? 0, fallos: canal.totalFallos ?? 0 };
+  }
+  return canal.historico;
+}
+
+/** Copia de seguridad del archivo entero, p. ej. antes del reinicio mensual. */
+function copia(etiqueta) {
+  guardarAhora();
+  try {
+    const destino = path.join(DIR, `guilds.${etiqueta}.json`);
+    if (!fs.existsSync(destino)) fs.copyFileSync(FILE, destino);
+    return destino;
+  } catch (err) {
+    console.error('[store] No se pudo hacer la copia:', err.message);
+    return null;
+  }
+}
+
+module.exports = {
+  cargar,
+  guardar,
+  guardarAhora,
+  copia,
+  getGuild,
+  getConfig,
+  getCanal,
+  getUsuario,
+  historico,
+  historicoCanal,
+  db: () => db,
+};

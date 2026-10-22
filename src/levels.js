@@ -20,35 +20,41 @@ function xpTotalHasta(nivel, cfg) {
 }
 
 /**
- * Calcula el nivel a partir de la XP acumulada.
- * Devuelve también los datos para dibujar la barra tipo [▰▰▱▱▱▱▱▱▱▱] 110 / 120
+ * Calcula el nivel a partir de la XP acumulada. Los niveles no tienen tope.
+ * Devuelve también los datos para dibujar la barra del nivel actual, que
+ * empieza de cero en cada nivel: [▰▱▱▱▱▱▱▱▱▱] 1 / 20
+ *   actual    → XP ganada dentro de este nivel
+ *   necesario → XP que cuesta este nivel entero
  */
 function calcular(xp, cfg) {
   let nivel = 0;
   let inicio = 0;
   let siguiente = xpParaSubir(0, cfg);
 
-  // Tope de seguridad por si alguien acumula XP absurda
-  while (xp >= siguiente && nivel < 10000) {
+  while (xp >= siguiente) {
     nivel++;
     inicio = siguiente;
     siguiente += xpParaSubir(nivel, cfg);
   }
 
+  const actual = xp - inicio;
+  const necesario = siguiente - inicio;
   return {
     nivel,
     xp,
     inicio,
     siguiente,
+    actual,
+    necesario,
     faltan: siguiente - xp,
-    barra: barra(xp - inicio, siguiente - inicio, cfg.segmentosBarra),
+    barra: barra(actual, necesario, cfg.segmentosBarra),
   };
 }
 
-/** Línea lista para meter en un embed. */
+/** Barra lista para un panel: `[▰▱▱▱▱▱▱▱▱▱] 1 / 20` */
 function texto(xp, cfg) {
   const n = calcular(xp, cfg);
-  return `\`[${n.barra}]\` **${n.xp}** / ${n.siguiente}`;
+  return `\`[${n.barra}] ${n.actual} / ${n.necesario}\``;
 }
 
 /** Devuelve el nivel nuevo si la XP añadida hizo subir de nivel, si no null. */
