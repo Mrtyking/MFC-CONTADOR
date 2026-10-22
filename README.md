@@ -84,9 +84,11 @@ El bot solo funciona en el servidor `1155074712402149437`. Si está en cualquier
 
 ## Reglas
 
+En el canal del contador el bot **no escribe mensajes**: solo reacciona (✔ si está bien, el emoji de fallo si se rompe) y borra lo que no son números.
+
 1. Se cuenta de uno en uno.
 2. **No puedes contar dos veces seguidas** (se puede permitir con `permitirRepetir`).
-3. Si el número está mal o te saltas el turno: la cadena se rompe, vuelve al 1 y te llevas un timeout **suave**.
+3. Si el número está mal (también si está mal escrito, como `3a` o `3/2`) o te saltas el turno: la cadena se rompe, vuelve al 1 y te llevas un timeout **suave**.
 4. **En el canal solo se cuenta.** Cualquier mensaje que no sea un número (`?`, charla, imágenes, stickers) se borra, rompe la cadena y se castiga **fuerte**: 1 hora, ×2 si reincide (`timeoutHabladeraMin`, tope `timeoutHabladeraMaxMin`).
 
 `13 vamos!` sí cuenta como 13: lo que importa es que el mensaje empiece por el número.
@@ -241,7 +243,7 @@ La fórmula es `xpBase × (nivel+1) ^ xpExponente`. Sube `xpExponente` para hace
 | `borrarInvalidos` | `true` | Borrar los mensajes que no son números |
 | `timeoutHabladeraMin` | `60` | Castigo por escribir algo que no es un número |
 | `timeoutHabladeraMaxMin` | `1440` | Tope de ese castigo (24 h) |
-| `avisarBorrados` | `true` | Avisar si borran/editan el último número |
+| `avisarBorrados` | `false` | Avisar en el canal si borran/editan el último número |
 | `timeoutsActivos` | `true` | Aplicar timeouts |
 | `quitarSoloRolesAdmin` | `true` | Al castigar a un admin, quitarle solo los roles de admin |
 | `minutosPorNumero` | `0.1` | Minutos de castigo por cada número |
@@ -287,7 +289,6 @@ Todos los mensajes del bot usan **Components V2**, el sistema nuevo de Discord: 
 - `/contador`: botones Actualizar, Mi nivel, Top y Ayuda.
 - `/top`: menú para cambiar de ranking.
 - `/ayuda`: botones por sección y menú desplegable.
-- Cadena rota: botones Mi nivel y Top.
 
 Los botones piden el mismo permiso que su comando. Lo que abren desde un mensaje público sale como mensaje efímero, para no llenar el canal.
 

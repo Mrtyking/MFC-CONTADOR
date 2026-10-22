@@ -19,9 +19,31 @@ const MAX_LARGO = 200; // no se analizan mensajes más largos que esto
 const MAX_PARENTESIS = 20;
 
 function leerNumero(contenido) {
-  const limpio = String(contenido ?? '').trim().slice(0, MAX_LARGO);
+  const limpio = normalizar(contenido);
   if (!limpio) return null;
   return leerCuenta(limpio) ?? leerPalabras(limpio);
+}
+
+/**
+ * Quita lo que no cambia el número: formato de Discord alrededor (**3**,
+ * ||3||, `3`, > 3, # 3) y cifras raras del móvil (３ → 3, 3️⃣ → 3).
+ */
+function normalizar(contenido) {
+  return String(contenido ?? '')
+    .normalize('NFKC')
+    .replace(/(\d)️?⃣/g, '$1')
+    .trim()
+    .replace(/^[\s*_~|`>#]+/, '')
+    .replace(/[\s*_~|`]+$/, '')
+    .slice(0, MAX_LARGO);
+}
+
+/**
+ * ¿Es un intento de número aunque esté mal escrito? ("3a", "3/2", "5-9")
+ * Sirve para castigarlo como número equivocado (suave) y no como charla.
+ */
+function pareceNumero(contenido) {
+  return /\p{Nd}/u.test(normalizar(contenido));
 }
 
 /* ------------------------------------------------------------------ */
@@ -205,4 +227,4 @@ function leerPalabras(s) {
   return Number.isSafeInteger(valor) ? { valor, texto: s.trim() } : null;
 }
 
-module.exports = { leerNumero };
+module.exports = { leerNumero, pareceNumero };

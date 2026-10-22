@@ -252,22 +252,17 @@ async function enviar(userId, texto) {
   r = await enviar('B', 'cuatro');
   comprobar('"cuatro" cuenta como el 4', r.embeds.length === 0 && store.getCanal(GUILD, CANAL).actual === 4);
   r = await enviar('A', '2*3');
-  comprobar('el aviso enseña la cuenta', /`2\*3` \(= 6\)/.test(r.embeds[0]?.desc ?? ''), r.embeds[0]?.desc?.split('\n')[1]);
+  comprobar('"2*3" (= 6) rompe cuando tocaba el 5', store.getCanal(GUILD, CANAL).actual === 0 && r.m.reacciones.includes('❌'));
+  comprobar('el bot no escribe en el canal', r.embeds.length === 0);
   const c0 = store.getCanal(GUILD, CANAL);
   c0.actual = 2; // se deja como antes para la prueba del turno
   c0.ultimoUsuario = 'B';
 
   console.log('\n=== turno repetido ===');
   r = await enviar('B', '3');
-  comprobar('mismo usuario dos veces = rompe', /Cadena rota/.test(r.embeds[0]?.titulo ?? ''));
-  comprobar('el aviso es un panel V2 (sin embeds)', r.embeds[0]?.v2 === true);
-  comprobar(
-    'el panel trae los botones',
-    r.embeds[0]?.botones.join('|') === 'mfc:nivel|mfc:top',
-    r.embeds[0]?.botones.join(', '),
-  );
-  comprobar('mensaje explica el turno', /dos veces seguidas/.test(r.embeds[0]?.desc ?? ''));
-  comprobar('contador reiniciado', store.getCanal(GUILD, CANAL).actual === 0);
+  comprobar('mismo usuario dos veces = rompe', store.getCanal(GUILD, CANAL).actual === 0);
+  comprobar('reacciona con el emoji de fallo', r.m.reacciones.includes('❌'), r.m.reacciones.join(' '));
+  comprobar('sin mensaje del bot', r.embeds.length === 0);
   comprobar('hubo timeout', r.timeouts.length === 1, formatDuracion(r.timeouts[0]?.ms ?? 0));
 
   console.log('\n=== número equivocado (ejemplo del enunciado) ===');
@@ -282,25 +277,7 @@ async function enviar(userId, texto) {
   const min1 = (r.timeouts[0]?.ms ?? 0) / 60000;
   comprobar('C recibe timeout', r.timeouts.length === 1);
   comprobar('castigo suave: 1 min', min1 === 1, `${min1} min`);
-  comprobar('embed dice qué se esperaba', /se esperaba `3`/.test(r.embeds[0]?.desc ?? ''));
-  comprobar('llegaron hasta 2', r.embeds[0]?.campos['Llegaron hasta'] === '`2`');
-  comprobar(
-    'los valores van con fondo oscuro',
-    ['Llegaron hasta', 'Récord', 'Timeout', 'Infracciones', 'Nivel'].every((c) =>
-      r.embeds[0]?.campos[c]?.startsWith('`'),
-    ),
-    JSON.stringify(r.embeds[0]?.campos),
-  );
-  comprobar(
-    'el embed no filtra motivos técnicos',
-    !/permiso|rol está por encima|Missing|error/i.test(JSON.stringify(r.embeds[0]?.campos)),
-  );
-  comprobar(
-    'el embed solo lleva los 5 campos de siempre',
-    Object.keys(r.embeds[0]?.campos ?? {}).join('|') ===
-      'Llegaron hasta|Récord|Timeout|Infracciones|Nivel',
-    Object.keys(r.embeds[0]?.campos ?? {}).join(', '),
-  );
+  comprobar('sin mensaje del bot', r.embeds.length === 0);
 
   console.log('\n=== reincidencia (anti-spam) ===');
   const castigos = [];
@@ -328,9 +305,8 @@ async function enviar(userId, texto) {
   miembro(DUENO, { roles: ['r_admin'] }); // al dueño no se le puede castigar
   const silenciadoAntes = store.getUsuario(GUILD, DUENO).totalTimeoutMs;
   r = await enviar(DUENO, '999');
-  comprobar('la cadena se rompe igual', /Cadena rota/.test(r.embeds[0]?.titulo ?? ''));
+  comprobar('la cadena se rompe igual', canal.actual === 0);
   comprobar('no se le suma tiempo silenciado', store.getUsuario(GUILD, DUENO).totalTimeoutMs === silenciadoAntes);
-  comprobar('el panel dice que no hubo timeout', r.embeds[0]?.campos.Timeout === '`—`');
 
   console.log('\n=== escribir algo que no es un número ===');
   for (const texto of ['?', 'hola que tal', '']) {
@@ -338,25 +314,40 @@ async function enviar(userId, texto) {
     canal.ultimoUsuario = null;
     store.getUsuario(GUILD, 'HABLA').ultimaInfraccion = 0;
     r = await enviar('HABLA', texto);
-    comprobar(`"${texto}" rompe la cadena`, canal.actual === 0 && /Cadena rota/.test(r.embeds[0]?.titulo ?? ''));
+    comprobar(`"${texto}" rompe la cadena`, canal.actual === 0 && r.embeds.length === 0);
     comprobar(`"${texto}" se borra`, r.m.borrado === true);
     comprobar(`"${texto}" castigo fuerte: 1 hora`, r.timeouts[0]?.ms === 60 * 60000, formatDuracion(r.timeouts[0]?.ms ?? 0));
   }
   r = await enviar('HABLA', '???');
   comprobar('si reincide, ×2: 2 horas', r.timeouts[0]?.ms === 120 * 60000, formatDuracion(r.timeouts[0]?.ms ?? 0));
-  comprobar('el aviso explica que aquí solo se cuenta', /solo se cuenta/.test(r.embeds[0]?.desc ?? ''));
   canal.actual = 7;
   canal.ultimoUsuario = null;
   r = await enviar('SUAVE', '9');
   comprobar('equivocarse de número sigue siendo suave', r.timeouts[0]?.ms === 60000, formatDuracion(r.timeouts[0]?.ms ?? 0));
+
+  console.log('\n=== números mal escritos: suave, no 1 hora ===');
+  for (const texto of ['3a', '3/2', '5-9', '1234567890123456']) {
+    canal.actual = 7;
+    canal.ultimoUsuario = null;
+    store.getUsuario(GUILD, 'MAL').ultimaInfraccion = 0;
+    r = await enviar('MAL', texto);
+    comprobar(`"${texto}" rompe como número equivocado (1 min)`, canal.actual === 0 && r.timeouts[0]?.ms === 60000, formatDuracion(r.timeouts[0]?.ms ?? 0));
+    comprobar(`"${texto}" no se borra, lleva la reacción`, !r.m.borrado && r.m.reacciones.includes('❌'));
+  }
+  for (const [texto, n] of [['**8**', 8], ['||9||', 9], ['`10`', 10], ['１１', 11]]) {
+    canal.actual = n - 1;
+    canal.ultimoUsuario = null;
+    r = await enviar('FORMATO', texto);
+    comprobar(`"${texto}" cuenta como el ${n}`, canal.actual === n && r.timeouts.length === 0);
+  }
 
   console.log('\n=== el dueño del bot no se lleva timeout ===');
   const { DUENO_BOT } = require('../src/permisos');
   canal.actual = 5;
   canal.ultimoUsuario = null;
   r = await enviar(DUENO_BOT, '99');
-  comprobar('la cadena se rompe igual', canal.actual === 0 && /Cadena rota/.test(r.embeds[0]?.titulo ?? ''));
-  comprobar('sin timeout', r.timeouts.length === 0 && r.embeds[0]?.campos.Timeout === '`—`');
+  comprobar('la cadena se rompe igual', canal.actual === 0);
+  comprobar('sin timeout', r.timeouts.length === 0);
   comprobar('sin infracciones', store.getUsuario(GUILD, DUENO_BOT).infracciones === 0);
   comprobar('el fallo sí se cuenta', store.getUsuario(GUILD, DUENO_BOT).fallos === 1);
   canal.actual = 5;

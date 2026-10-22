@@ -14,7 +14,7 @@ const DEFAULTS = {
   permitirRepetir: false, // false = un mismo usuario no puede contar dos veces seguidas
   celebrarHitos: true, // reacción extra en múltiplos de 100
   borrarInvalidos: true, // borrar los mensajes que no son números (además rompen la cadena)
-  avisarBorrados: true, // avisar si borran/editan el último número
+  avisarBorrados: false, // avisar en el canal si borran/editan el último número (apagado: el bot no escribe en el canal)
 
   // --- Timeouts ---
   timeoutsActivos: true,

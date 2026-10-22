@@ -2,12 +2,11 @@
 
 const { PermissionFlagsBits } = require('discord.js');
 const store = require('./store');
-const levels = require('./levels');
 const sanciones = require('./sanciones');
 const { calcularCastigo } = require('./timeouts');
-const { parseNumero, formatDuracion, resolverEmoji } = require('./utils');
-const { leerNumero } = require('./numeros');
-const { Panel, boton, aviso } = require('./ui');
+const { parseNumero, resolverEmoji } = require('./utils');
+const { leerNumero, pareceNumero } = require('./numeros');
+const { aviso } = require('./ui');
 const { DUENO_BOT } = require('./permisos');
 
 const COLOR_OK = 0x57f287;
@@ -78,8 +77,9 @@ async function manejarMensaje(message) {
   const canal = store.getCanal(message.guild.id, message.channel.id);
   if (!canal) return; // este canal no es de conteo
 
-  // Cifras, cuentas (1+1) o palabras (veintitrés, twenty-one). Cualquier otra
-  // cosa (charla, "?", una imagen…) se borra y cuenta como romper la cadena.
+  // Cifras, cuentas (1+1) o palabras (veintitrés, twenty-one).
+  //   · Un número mal escrito ("3a", "3/2") es un número equivocado: castigo suave.
+  //   · Cualquier otra cosa (charla, "?", una imagen…) se borra: castigo fuerte.
   const leido = leerNumero(message.content);
   const numero = leido?.valor ?? null;
 
@@ -87,7 +87,7 @@ async function manejarMensaje(message) {
   const mismoUsuario = canal.ultimoUsuario === message.author.id;
 
   let motivo = null;
-  if (!leido) motivo = MOTIVO.HABLADERA;
+  if (!leido) motivo = pareceNumero(message.content) ? MOTIVO.NUMERO : MOTIVO.HABLADERA;
   else if (numero !== esperado) motivo = MOTIVO.NUMERO;
   else if (mismoUsuario && !cfg.permitirRepetir) motivo = MOTIVO.TURNO;
 
@@ -98,7 +98,6 @@ async function manejarMensaje(message) {
   const historicoCanal = store.historicoCanal(canal);
 
   if (!motivo) {
-    const xpAntes = canal.xp;
     canal.actual = numero;
     canal.ultimoUsuario = message.author.id;
     canal.ultimoMensajeId = message.id;
@@ -114,26 +113,11 @@ async function manejarMensaje(message) {
     if (usuario.rachaActual > historico.mejorRacha) historico.mejorRacha = usuario.rachaActual;
     store.guardar();
 
-    // --- Efectos asíncronos ---
-    // Las reacciones van en orden (check y luego hito), pero a la vez que el
-    // aviso de nivel, para que el canal responda rápido.
-    const reacciones = reaccionar(message, message.client, cfg.emojiOk, '✅').then(() =>
-      cfg.celebrarHitos && numero % 100 === 0
-        ? reaccionar(message, message.client, cfg.emojiHito, null)
-        : null,
-    );
-
-    const nivelNuevo = levels.subioDeNivel(xpAntes, canal.xp, cfg);
-    let aviso = null;
-    if (nivelNuevo) {
-      const info = levels.calcular(canal.xp, cfg);
-      const panel = new Panel(COLOR_OK)
-        .cabecera('¡Nivel alcanzado!', { subtitulo: `El canal subió al **nivel ${nivelNuevo}**.` })
-        .separador()
-        .cita(`\`[${info.barra}] ${info.actual} / ${info.necesario}\``);
-      aviso = message.channel.send(panel.mensaje()).catch(() => {});
+    // El bot no escribe en el canal: solo reacciona (check y, cada 100, el hito)
+    await reaccionar(message, message.client, cfg.emojiOk, '✅');
+    if (cfg.celebrarHitos && numero % 100 === 0) {
+      await reaccionar(message, message.client, cfg.emojiHito, null);
     }
-    await Promise.all([reacciones, aviso]);
     return;
   }
 
@@ -141,16 +125,8 @@ async function manejarMensaje(message) {
   // El dueño del bot rompe la cadena como cualquiera, pero sin timeout ni
   // infracciones. Al resto se le castiga siempre.
   const exento = message.author.id === DUENO_BOT;
-  const castigable = cfg.timeoutsActivos && !exento;
   const habladera = motivo === MOTIVO.HABLADERA;
-
-  const llegoHasta = canal.actual;
-  const castigo = calcularCastigo({
-    numeroArruinado: esperado,
-    usuario,
-    cfg,
-    habladera,
-  });
+  const castigo = calcularCastigo({ numeroArruinado: esperado, usuario, cfg, habladera });
 
   usuario.fallos++;
   usuario.rachaActual = 0;
@@ -167,66 +143,25 @@ async function manejarMensaje(message) {
   historicoCanal.fallos++;
   store.guardar();
 
-  // Mientras se aplica el castigo: reacción si era un número, borrado si no
+  // Sin mensaje en el canal: reacción si era un número, borrado si era charla,
+  // y a la vez el timeout
   const efecto = habladera
     ? cfg.borrarInvalidos && message.deletable
       ? message.delete().catch(() => {})
       : null
     : reaccionar(message, message.client, cfg.emojiFail, '❌');
 
-  const resultado = castigable
-    ? await silenciar(
-        message,
-        usuario,
-        castigo.ms,
-        habladera
-          ? `Escribió algo que no es un número en el contador (infracción #${castigo.infracciones})`
-          : `Rompió el contador en ${esperado} (infracción #${castigo.infracciones})`,
-      )
-    : { ok: false };
-  await efecto;
-
-  let subtitulo;
-  if (habladera) {
-    subtitulo = `**${message.author.username}** escribió algo que no es un número. **Aquí solo se cuenta.**`;
-  } else {
-    // Si escribió una cuenta o palabras, se ve lo que puso y lo que vale: `1+1` (= 2)
-    const texto = leido.texto.replace(/`/g, "'").slice(0, 40);
-    const enviado = texto === String(numero) ? `\`${numero}\`` : `\`${texto}\` (= ${numero})`;
-    subtitulo =
-      motivo === MOTIVO.TURNO
-        ? `**${message.author.username}** envió ${enviado} — **no puedes contar dos veces seguidas**`
-        : `**${message.author.username}** envió ${enviado} — se esperaba \`${esperado}\``;
+  if (cfg.timeoutsActivos && !exento) {
+    await silenciar(
+      message,
+      usuario,
+      castigo.ms,
+      habladera
+        ? `Escribió algo que no es un número en el contador (infracción #${castigo.infracciones})`
+        : `Rompió el contador en ${esperado} (infracción #${castigo.infracciones})`,
+    );
   }
-
-  const info = levels.calcular(canal.xp, cfg);
-  const panel = new Panel(COLOR_FAIL)
-    .cabecera('Cadena rota', {
-      subtitulo,
-      imagen: message.author.displayAvatarURL({ size: 128 }) || undefined,
-    })
-    .separador()
-    .campos([
-      ['Llegaron hasta', `\`${llegoHasta}\``],
-      ['Récord', `\`${canal.record}\``],
-      ['Timeout', resultado.ok ? `\`${formatDuracion(castigo.ms)}\`` : '`—`'],
-      [
-        'Infracciones',
-        exento
-          ? `\`${usuario.infracciones ?? 0}\``
-          : castigo.multiplicador > 1
-            ? `\`${castigo.infracciones}\` · castigo \`×${castigo.multiplicador}\``
-            : `\`${castigo.infracciones}\``,
-      ],
-      ['Nivel', `\`[${info.barra}] ${info.actual} / ${info.necesario}\``],
-    ])
-    .separador()
-    .botones(boton('mfc:nivel', 'Mi nivel'), boton('mfc:top', 'Top'))
-    .pie(`El contador vuelve a 1 · Respeta el turno · <t:${Math.floor(Date.now() / 1000)}:t>`);
-
-  try {
-    await message.channel.send(panel.mensaje());
-  } catch {}
+  await efecto;
 }
 
 /** Aviso cuando alguien borra el último número (para que nadie se pierda). */
