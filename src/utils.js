@@ -1,15 +1,13 @@
 'use strict';
 
+const { leerNumero } = require('./numeros');
+
 /**
- * Saca el número de un mensaje. Acepta "13" y "13 vamos!".
- * Devuelve null si el mensaje no empieza por un número.
+ * Saca el número de un mensaje: "13", "13 vamos!", "1+1", "veintitrés"…
+ * Devuelve null si el mensaje no es un número. Ver numeros.js.
  */
 function parseNumero(contenido) {
-  const limpio = contenido.trim();
-  const m = /^(\d{1,15})(?:\s|$|[^\d\w])/.exec(limpio) || /^(\d{1,15})$/.exec(limpio);
-  if (!m) return null;
-  const n = Number(m[1]);
-  return Number.isSafeInteger(n) ? n : null;
+  return leerNumero(contenido)?.valor ?? null;
 }
 
 /**

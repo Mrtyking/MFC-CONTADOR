@@ -348,7 +348,7 @@ function panelAyuda(guildId, seccion = 'inicio') {
       .texto(
         [
           '**¿Cómo se juega?**',
-          '**1.** Se cuenta de uno en uno en el canal configurado.',
+          '**1.** Se cuenta de uno en uno en el canal configurado. Vale escribirlo como quieras: `7`, `3+4`, `siete` o `seven`.',
           `**2.** ${cfg.permitirRepetir ? 'Puedes contar seguido.' : 'No puedes contar dos veces seguidas: hay que respetar el turno.'}`,
           '**3.** Si el número está mal, la cadena se rompe, vuelve al 1 y quien la rompió se lleva un timeout.',
         ].join('\n'),

@@ -86,6 +86,19 @@ Y ya. La gente escribe `1`, `2`, `3`… el bot reacciona con el check a cada aci
 
 Los mensajes que no empiezan por un número se ignoran (`13 vamos!` sí cuenta como 13).
 
+El número se puede escribir de varias formas:
+
+| Forma | Ejemplos |
+|---|---|
+| Cifras | `13`, `13 vamos!` |
+| Cuentas | `1+1` → 2, `99999999-99999998` → 1, `(2+3)*4` → 20, `10/2`, `2^5`, `3x4` |
+| Palabras (español) | `uno`, `veintitrés`, `ciento uno`, `dos mil trescientos` |
+| Palabras (inglés) | `one`, `twenty-one`, `one hundred and five` |
+
+- Las cuentas tienen que dar un entero positivo: `3/2` o `5-9` se ignoran.
+- Con palabras, el mensaje tiene que ser **solo** el número. Así `una pregunta` no cuenta como un 1.
+- Las cuentas las lee el bot con su propio analizador, nunca ejecuta lo que se escribe.
+
 ## Cómo se calcula el timeout
 
 **Base — según el número arruinado:**

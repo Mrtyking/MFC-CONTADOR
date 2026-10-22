@@ -193,6 +193,33 @@ async function enviar(userId, texto) {
   comprobar('"hola" -> null', parseNumero('hola') === null);
   comprobar('"a13" -> null', parseNumero('a13') === null);
   comprobar('"  7  " -> 7', parseNumero('  7  ') === 7);
+  comprobar('"13abc" -> null', parseNumero('13abc') === null);
+
+  console.log('\n=== cuentas y palabras ===');
+  for (const [texto, esperado] of [
+    ['1+1', 2],
+    ['99999999-99999998', 1],
+    ['(2+3)*4', 20],
+    ['10/2', 5],
+    ['2^5', 32],
+    ['3x4', 12],
+    ['13 - vamos', 13],
+    ['3/2', null],
+    ['5-9', null],
+    ['1/0', null],
+    ['uno', 1],
+    ['Veintitrés', 23],
+    ['dos mil trescientos', 2300],
+    ['ciento uno', 101],
+    ['twenty-one', 21],
+    ['one hundred and five', 105],
+    ['¡veinte!', 20],
+    ['una pregunta', null],
+    ['once upon a time', null],
+    ['hola', null],
+  ]) {
+    comprobar(`"${texto}" -> ${esperado}`, parseNumero(texto) === esperado, String(parseNumero(texto)));
+  }
 
   console.log('\n=== barra de nivel ===');
   comprobar('0/10 vacía', barra(0, 10) === '▱▱▱▱▱▱▱▱▱▱', barra(0, 10));
@@ -218,6 +245,17 @@ async function enviar(userId, texto) {
   r = await enviar('B', '2');
   comprobar('2 aceptado por otro usuario', r.embeds.length === 0);
   comprobar('contador va por 2', store.getCanal(GUILD, CANAL).actual === 2);
+  r = await enviar('A', '1+2');
+  comprobar('"1+2" cuenta como el 3', r.embeds.length === 0 && store.getCanal(GUILD, CANAL).actual === 3);
+  r = await enviar('B', 'cuatro');
+  comprobar('"cuatro" cuenta como el 4', r.embeds.length === 0 && store.getCanal(GUILD, CANAL).actual === 4);
+  r = await enviar('A', 'una pregunta');
+  comprobar('una frase normal se ignora', r.embeds.length === 0 && store.getCanal(GUILD, CANAL).actual === 4);
+  r = await enviar('A', '2*3');
+  comprobar('el aviso enseña la cuenta', /`2\*3` \(= 6\)/.test(r.embeds[0]?.desc ?? ''), r.embeds[0]?.desc?.split('\n')[1]);
+  const c0 = store.getCanal(GUILD, CANAL);
+  c0.actual = 2; // se deja como antes para la prueba del turno
+  c0.ultimoUsuario = 'B';
 
   console.log('\n=== turno repetido ===');
   r = await enviar('B', '3');

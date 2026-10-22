@@ -6,6 +6,7 @@ const levels = require('./levels');
 const sanciones = require('./sanciones');
 const { calcularCastigo } = require('./timeouts');
 const { parseNumero, formatDuracion, resolverEmoji } = require('./utils');
+const { leerNumero } = require('./numeros');
 const { Panel, boton, aviso } = require('./ui');
 const { DUENO_BOT } = require('./permisos');
 
@@ -40,8 +41,9 @@ async function manejarMensaje(message) {
   const canal = store.getCanal(message.guild.id, message.channel.id);
   if (!canal) return; // este canal no es de conteo
 
-  const numero = parseNumero(message.content);
-  if (numero === null) {
+  // Cifras, cuentas (1+1) o palabras (veintitrés, twenty-one)
+  const leido = leerNumero(message.content);
+  if (!leido) {
     if (cfg.borrarInvalidos && message.deletable) {
       try {
         await message.delete();
@@ -49,6 +51,7 @@ async function manejarMensaje(message) {
     }
     return;
   }
+  const numero = leido.valor;
 
   const esperado = canal.actual + 1;
   const mismoUsuario = canal.ultimoUsuario === message.author.id;
@@ -174,13 +177,17 @@ async function manejarMensaje(message) {
     );
   }
 
+  // Si escribió una cuenta o palabras, se ve lo que puso y lo que vale: `1+1` (= 2)
+  const texto = leido.texto.replace(/`/g, "'").slice(0, 40);
+  const enviado = texto === String(numero) ? `\`${numero}\`` : `\`${texto}\` (= ${numero})`;
+
   const info = levels.calcular(canal.xp, cfg);
   const panel = new Panel(COLOR_FAIL)
     .cabecera('Cadena rota', {
       subtitulo:
         motivo === MOTIVO.TURNO
-          ? `**${message.author.username}** envió \`${numero}\` — **no puedes contar dos veces seguidas**`
-          : `**${message.author.username}** envió \`${numero}\` — se esperaba \`${esperado}\``,
+          ? `**${message.author.username}** envió ${enviado} — **no puedes contar dos veces seguidas**`
+          : `**${message.author.username}** envió ${enviado} — se esperaba \`${esperado}\``,
       imagen: message.author.displayAvatarURL({ size: 128 }) || undefined,
     })
     .separador()
