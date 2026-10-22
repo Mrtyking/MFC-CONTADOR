@@ -13,7 +13,7 @@ const DEFAULTS = {
   // --- Reglas del conteo ---
   permitirRepetir: false, // false = un mismo usuario no puede contar dos veces seguidas
   celebrarHitos: true, // reacción extra en múltiplos de 100
-  borrarInvalidos: false, // borrar mensajes que no son números
+  borrarInvalidos: true, // borrar los mensajes que no son números (además rompen la cadena)
   avisarBorrados: true, // avisar si borran/editan el último número
 
   // --- Timeouts ---
@@ -26,6 +26,11 @@ const DEFAULTS = {
   minutosPorNumero: 0.1, // minutos = número arruinado × este factor (el 100 → 10 min)
   timeoutMinimoMin: 1,
   timeoutMaximoMin: 60, // tope de 1 hora (Discord deja hasta 28 días: 40320)
+
+  // Escribir algo que no es un número ("?", charla, imágenes) rompe la cadena
+  // con un castigo fuerte que no depende del número
+  timeoutHabladeraMin: 60, // 1 hora (×2 si reincide, hasta el tope)
+  timeoutHabladeraMaxMin: 1440, // tope de 24 horas
 
   // --- Anti-spam (reincidencia) ---
   multiplicadorSpam: 2, // cada infracción seguida multiplica el castigo por esto
@@ -63,6 +68,8 @@ const ESQUEMA = {
   minutosPorNumero: { tipo: 'num', min: 0.1, max: 60 },
   timeoutMinimoMin: { tipo: 'num', min: 1, max: 40320 },
   timeoutMaximoMin: { tipo: 'num', min: 1, max: 40320 },
+  timeoutHabladeraMin: { tipo: 'num', min: 1, max: 40320 },
+  timeoutHabladeraMaxMin: { tipo: 'num', min: 1, max: 40320 },
   multiplicadorSpam: { tipo: 'num', min: 1, max: 10 },
   maxMultiplicadorSpam: { tipo: 'num', min: 1, max: 100 },
   ventanaSpamMin: { tipo: 'num', min: 1, max: 43200 },

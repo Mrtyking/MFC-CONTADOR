@@ -13,7 +13,7 @@ const MAX_DISCORD_MS = 28 * 24 * 60 * 60 * 1000; // límite duro de Discord
  * Si dejó pasar la ventana entera sin romper nada, sus infracciones se olvidan
  * y vuelve a recibir el timeout normal.
  */
-function calcularCastigo({ numeroArruinado, usuario, cfg, ahora = Date.now() }) {
+function calcularCastigo({ numeroArruinado, usuario, cfg, habladera = false, ahora = Date.now() }) {
   const ventanaMs = cfg.ventanaSpamMin * 60 * 1000;
   const expiro = !usuario.ultimaInfraccion || ahora - usuario.ultimaInfraccion > ventanaMs;
 
@@ -26,12 +26,17 @@ function calcularCastigo({ numeroArruinado, usuario, cfg, ahora = Date.now() }) 
     Math.pow(cfg.multiplicadorSpam, infracciones - 1),
   );
 
-  const baseMin = Math.max(
-    cfg.timeoutMinimoMin,
-    Math.min(cfg.timeoutMaximoMin, Math.round(numeroArruinado * cfg.minutosPorNumero)),
-  );
+  // Escribir algo que no es un número tiene su propio castigo, más fuerte y
+  // que no depende del número
+  const tope = habladera ? cfg.timeoutHabladeraMaxMin : cfg.timeoutMaximoMin;
+  const baseMin = habladera
+    ? cfg.timeoutHabladeraMin
+    : Math.max(
+        cfg.timeoutMinimoMin,
+        Math.min(cfg.timeoutMaximoMin, Math.round(numeroArruinado * cfg.minutosPorNumero)),
+      );
 
-  const totalMin = Math.min(cfg.timeoutMaximoMin, Math.round(baseMin * multiplicador));
+  const totalMin = Math.min(tope, Math.round(baseMin * multiplicador));
   const ms = Math.min(MAX_DISCORD_MS, totalMin * 60 * 1000);
 
   return {

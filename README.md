@@ -36,7 +36,7 @@ Al arrancar, el bot imprime en consola su enlace de invitación con los permisos
 | Añadir reacciones + Usar emojis externos | el check ✅ |
 | **Aislar miembros** (Moderate Members) | aplicar los timeouts |
 | **Gestionar roles** (Manage Roles) | castigar también a los administradores |
-| Gestionar mensajes | solo si activas `borrarInvalidos` |
+| Gestionar mensajes | para borrar lo que no son números (`borrarInvalidos`) |
 
 Importante: en **Ajustes del servidor → Roles**, el rol del bot tiene que estar **por encima** de los roles de la gente a la que va a moderar. Cuanto más arriba, a más gente alcanza. Ver [Timeouts a administradores](#timeouts-a-administradores).
 
@@ -86,9 +86,10 @@ El bot solo funciona en el servidor `1155074712402149437`. Si está en cualquier
 
 1. Se cuenta de uno en uno.
 2. **No puedes contar dos veces seguidas** (se puede permitir con `permitirRepetir`).
-3. Si el número está mal o te saltas el turno: la cadena se rompe, vuelve al 1 y te llevas un timeout.
+3. Si el número está mal o te saltas el turno: la cadena se rompe, vuelve al 1 y te llevas un timeout **suave**.
+4. **En el canal solo se cuenta.** Cualquier mensaje que no sea un número (`?`, charla, imágenes, stickers) se borra, rompe la cadena y se castiga **fuerte**: 1 hora, ×2 si reincide (`timeoutHabladeraMin`, tope `timeoutHabladeraMaxMin`).
 
-Los mensajes que no empiezan por un número se ignoran (`13 vamos!` sí cuenta como 13).
+`13 vamos!` sí cuenta como 13: lo que importa es que el mensaje empiece por el número.
 
 El número se puede escribir de varias formas:
 
@@ -99,8 +100,8 @@ El número se puede escribir de varias formas:
 | Palabras (español) | `uno`, `veintitrés`, `ciento uno`, `dos mil trescientos` |
 | Palabras (inglés) | `one`, `twenty-one`, `one hundred and five` |
 
-- Las cuentas tienen que dar un entero positivo: `3/2` o `5-9` se ignoran.
-- Con palabras, el mensaje tiene que ser **solo** el número. Así `una pregunta` no cuenta como un 1.
+- Las cuentas tienen que dar un entero positivo: `3/2` o `5-9` no son números válidos (cuentan como charla).
+- Con palabras, el mensaje tiene que ser **solo** el número: `una pregunta` no es un 1, es charla.
 - Las cuentas las lee el bot con su propio analizador, nunca ejecuta lo que se escribe.
 
 ## Cómo se calcula el timeout
@@ -237,7 +238,9 @@ La fórmula es `xpBase × (nivel+1) ^ xpExponente`. Sube `xpExponente` para hace
 | `emojiFail` | `1545719040608174150` | Reacción cuando se rompe (ID o unicode) |
 | `permitirRepetir` | `false` | Permitir contar dos veces seguidas |
 | `celebrarHitos` | `true` | Reacción extra en múltiplos de 100 |
-| `borrarInvalidos` | `false` | Borrar mensajes que no son números |
+| `borrarInvalidos` | `true` | Borrar los mensajes que no son números |
+| `timeoutHabladeraMin` | `60` | Castigo por escribir algo que no es un número |
+| `timeoutHabladeraMaxMin` | `1440` | Tope de ese castigo (24 h) |
 | `avisarBorrados` | `true` | Avisar si borran/editan el último número |
 | `timeoutsActivos` | `true` | Aplicar timeouts |
 | `quitarSoloRolesAdmin` | `true` | Al castigar a un admin, quitarle solo los roles de admin |

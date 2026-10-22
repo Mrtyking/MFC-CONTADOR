@@ -28,10 +28,47 @@ async function reaccionar(message, client, valor, respaldo) {
   return null;
 }
 
+/**
+ * Aplica un timeout (si es admin, sanciones le quita los roles primero) y lo
+ * suma al tiempo silenciado solo si se aplicó de verdad. Lo técnico va a la
+ * consola, no al canal. Devuelve { ok, ... }.
+ */
+async function silenciar(message, usuario, ms, razon) {
+  let resultado;
+  if (!message.guild.members.me?.permissions.has(PermissionFlagsBits.ModerateMembers)) {
+    resultado = { ok: false, motivo: 'me falta el permiso Aislar miembros' };
+  } else {
+    const member =
+      message.member ?? (await message.guild.members.fetch(message.author.id).catch(() => null));
+    resultado = member
+      ? await sanciones.castigar(member, ms, razon)
+      : { ok: false, motivo: 'ya no está en el servidor' };
+  }
+
+  if (resultado.ok) {
+    usuario.totalTimeoutMs += ms;
+    store.historico(usuario).totalTimeoutMs += ms;
+    store.guardar();
+    if (resultado.metodo === 'roles') {
+      console.log(
+        `[timeout] ${message.author.username} es admin: retirados ${resultado.roles.length} rol(es) — ${resultado.roles
+          .map((r) => r.nombre)
+          .join(', ')}`,
+      );
+    }
+  } else {
+    console.warn(
+      `[timeout] No se pudo castigar a ${message.author.username} en ${message.guild.name}: ${resultado.motivo}`,
+    );
+  }
+  return resultado;
+}
+
 /** Motivos por los que se puede romper la cadena. */
 const MOTIVO = {
-  NUMERO: 'numero',
-  TURNO: 'turno',
+  NUMERO: 'numero', // número equivocado: castigo suave
+  TURNO: 'turno', // contó dos veces seguidas: castigo suave
+  HABLADERA: 'habladera', // escribió algo que no es un número: castigo fuerte
 };
 
 async function manejarMensaje(message) {
@@ -41,23 +78,17 @@ async function manejarMensaje(message) {
   const canal = store.getCanal(message.guild.id, message.channel.id);
   if (!canal) return; // este canal no es de conteo
 
-  // Cifras, cuentas (1+1) o palabras (veintitrés, twenty-one)
+  // Cifras, cuentas (1+1) o palabras (veintitrés, twenty-one). Cualquier otra
+  // cosa (charla, "?", una imagen…) se borra y cuenta como romper la cadena.
   const leido = leerNumero(message.content);
-  if (!leido) {
-    if (cfg.borrarInvalidos && message.deletable) {
-      try {
-        await message.delete();
-      } catch {}
-    }
-    return;
-  }
-  const numero = leido.valor;
+  const numero = leido?.valor ?? null;
 
   const esperado = canal.actual + 1;
   const mismoUsuario = canal.ultimoUsuario === message.author.id;
 
   let motivo = null;
-  if (numero !== esperado) motivo = MOTIVO.NUMERO;
+  if (!leido) motivo = MOTIVO.HABLADERA;
+  else if (numero !== esperado) motivo = MOTIVO.NUMERO;
   else if (mismoUsuario && !cfg.permitirRepetir) motivo = MOTIVO.TURNO;
 
   // --- Mutación de estado SÍNCRONA (antes de cualquier await) ---
@@ -111,12 +142,14 @@ async function manejarMensaje(message) {
   // infracciones. Al resto se le castiga siempre.
   const exento = message.author.id === DUENO_BOT;
   const castigable = cfg.timeoutsActivos && !exento;
+  const habladera = motivo === MOTIVO.HABLADERA;
 
   const llegoHasta = canal.actual;
   const castigo = calcularCastigo({
     numeroArruinado: esperado,
     usuario,
     cfg,
+    habladera,
   });
 
   usuario.fallos++;
@@ -134,60 +167,42 @@ async function manejarMensaje(message) {
   historicoCanal.fallos++;
   store.guardar();
 
-  // La reacción sale mientras se aplica el castigo
-  const reaccion = reaccionar(message, message.client, cfg.emojiFail, '❌');
+  // Mientras se aplica el castigo: reacción si era un número, borrado si no
+  const efecto = habladera
+    ? cfg.borrarInvalidos && message.deletable
+      ? message.delete().catch(() => {})
+      : null
+    : reaccionar(message, message.client, cfg.emojiFail, '❌');
 
-  // Timeout (si es admin, sanciones se encarga de quitarle los roles primero)
-  let resultado = { ok: false, motivo: 'sin timeout', metodo: null, roles: [] };
-  if (castigable) {
-    if (!message.guild.members.me?.permissions.has(PermissionFlagsBits.ModerateMembers)) {
-      resultado = { ok: false, motivo: 'me falta el permiso Aislar miembros', metodo: null, roles: [] };
-    } else {
-      const member =
-        message.member ?? (await message.guild.members.fetch(message.author.id).catch(() => null));
-      resultado = member
-        ? await sanciones.castigar(
-            member,
-            castigo.ms,
-            `Rompió el contador en ${esperado} (infracción #${castigo.infracciones})`,
-          )
-        : { ok: false, motivo: 'ya no está en el servidor', metodo: null, roles: [] };
-    }
+  const resultado = castigable
+    ? await silenciar(
+        message,
+        usuario,
+        castigo.ms,
+        habladera
+          ? `Escribió algo que no es un número en el contador (infracción #${castigo.infracciones})`
+          : `Rompió el contador en ${esperado} (infracción #${castigo.infracciones})`,
+      )
+    : { ok: false };
+  await efecto;
+
+  let subtitulo;
+  if (habladera) {
+    subtitulo = `**${message.author.username}** escribió algo que no es un número. **Aquí solo se cuenta.**`;
+  } else {
+    // Si escribió una cuenta o palabras, se ve lo que puso y lo que vale: `1+1` (= 2)
+    const texto = leido.texto.replace(/`/g, "'").slice(0, 40);
+    const enviado = texto === String(numero) ? `\`${numero}\`` : `\`${texto}\` (= ${numero})`;
+    subtitulo =
+      motivo === MOTIVO.TURNO
+        ? `**${message.author.username}** envió ${enviado} — **no puedes contar dos veces seguidas**`
+        : `**${message.author.username}** envió ${enviado} — se esperaba \`${esperado}\``;
   }
-
-  // Solo cuenta como tiempo silenciado si el timeout se aplicó de verdad
-  if (resultado.ok) {
-    usuario.totalTimeoutMs += castigo.ms;
-    historico.totalTimeoutMs += castigo.ms;
-    store.guardar();
-  }
-  await reaccion;
-
-  // Lo técnico va a la consola, no al canal: el embed es para los usuarios y
-  // solo tiene que decir que la cadena se rompió y cuánto dura el castigo.
-  if (castigable && !resultado.ok) {
-    console.warn(
-      `[timeout] No se pudo castigar a ${message.author.username} en ${message.guild.name}: ${resultado.motivo}`,
-    );
-  } else if (resultado.metodo === 'roles') {
-    console.log(
-      `[timeout] ${message.author.username} es admin: retirados ${resultado.roles.length} rol(es) — ${resultado.roles
-        .map((r) => r.nombre)
-        .join(', ')}`,
-    );
-  }
-
-  // Si escribió una cuenta o palabras, se ve lo que puso y lo que vale: `1+1` (= 2)
-  const texto = leido.texto.replace(/`/g, "'").slice(0, 40);
-  const enviado = texto === String(numero) ? `\`${numero}\`` : `\`${texto}\` (= ${numero})`;
 
   const info = levels.calcular(canal.xp, cfg);
   const panel = new Panel(COLOR_FAIL)
     .cabecera('Cadena rota', {
-      subtitulo:
-        motivo === MOTIVO.TURNO
-          ? `**${message.author.username}** envió ${enviado} — **no puedes contar dos veces seguidas**`
-          : `**${message.author.username}** envió ${enviado} — se esperaba \`${esperado}\``,
+      subtitulo,
       imagen: message.author.displayAvatarURL({ size: 128 }) || undefined,
     })
     .separador()

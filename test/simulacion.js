@@ -133,7 +133,9 @@ function mensaje(userId, contenido) {
     async react(emoji) {
       this.reacciones.push(String(emoji));
     },
-    async delete() {},
+    async delete() {
+      this.borrado = true;
+    },
   };
 }
 
@@ -249,8 +251,6 @@ async function enviar(userId, texto) {
   comprobar('"1+2" cuenta como el 3', r.embeds.length === 0 && store.getCanal(GUILD, CANAL).actual === 3);
   r = await enviar('B', 'cuatro');
   comprobar('"cuatro" cuenta como el 4', r.embeds.length === 0 && store.getCanal(GUILD, CANAL).actual === 4);
-  r = await enviar('A', 'una pregunta');
-  comprobar('una frase normal se ignora', r.embeds.length === 0 && store.getCanal(GUILD, CANAL).actual === 4);
   r = await enviar('A', '2*3');
   comprobar('el aviso enseña la cuenta', /`2\*3` \(= 6\)/.test(r.embeds[0]?.desc ?? ''), r.embeds[0]?.desc?.split('\n')[1]);
   const c0 = store.getCanal(GUILD, CANAL);
@@ -331,6 +331,24 @@ async function enviar(userId, texto) {
   comprobar('la cadena se rompe igual', /Cadena rota/.test(r.embeds[0]?.titulo ?? ''));
   comprobar('no se le suma tiempo silenciado', store.getUsuario(GUILD, DUENO).totalTimeoutMs === silenciadoAntes);
   comprobar('el panel dice que no hubo timeout', r.embeds[0]?.campos.Timeout === '`—`');
+
+  console.log('\n=== escribir algo que no es un número ===');
+  for (const texto of ['?', 'hola que tal', '']) {
+    canal.actual = 7;
+    canal.ultimoUsuario = null;
+    store.getUsuario(GUILD, 'HABLA').ultimaInfraccion = 0;
+    r = await enviar('HABLA', texto);
+    comprobar(`"${texto}" rompe la cadena`, canal.actual === 0 && /Cadena rota/.test(r.embeds[0]?.titulo ?? ''));
+    comprobar(`"${texto}" se borra`, r.m.borrado === true);
+    comprobar(`"${texto}" castigo fuerte: 1 hora`, r.timeouts[0]?.ms === 60 * 60000, formatDuracion(r.timeouts[0]?.ms ?? 0));
+  }
+  r = await enviar('HABLA', '???');
+  comprobar('si reincide, ×2: 2 horas', r.timeouts[0]?.ms === 120 * 60000, formatDuracion(r.timeouts[0]?.ms ?? 0));
+  comprobar('el aviso explica que aquí solo se cuenta', /solo se cuenta/.test(r.embeds[0]?.desc ?? ''));
+  canal.actual = 7;
+  canal.ultimoUsuario = null;
+  r = await enviar('SUAVE', '9');
+  comprobar('equivocarse de número sigue siendo suave', r.timeouts[0]?.ms === 60000, formatDuracion(r.timeouts[0]?.ms ?? 0));
 
   console.log('\n=== el dueño del bot no se lleva timeout ===');
   const { DUENO_BOT } = require('../src/permisos');
