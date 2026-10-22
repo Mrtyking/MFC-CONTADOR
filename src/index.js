@@ -59,6 +59,25 @@ const PERMISOS = [
   PermissionFlagsBits.ManageRoles, // para poder castigar también a los administradores
 ].reduce((a, b) => a | b, 0n);
 
+/**
+ * Únicos servidores donde puede estar el bot. De cualquier otro se sale solo,
+ * tanto al arrancar como si alguien lo mete después.
+ */
+const SERVIDORES_AUTORIZADOS = new Set(['1155074712402149437']);
+const autorizado = (guildId) => SERVIDORES_AUTORIZADOS.has(guildId);
+
+/** Se sale de un servidor no autorizado. Devuelve true si se salió. */
+async function salirSiNoAutorizado(guild) {
+  if (autorizado(guild.id)) return false;
+  try {
+    await guild.leave();
+    console.warn(`[servidores] Salí de ${guild.name} (${guild.id}): no está autorizado.`);
+  } catch (err) {
+    console.error(`[servidores] No pude salir de ${guild.name} (${guild.id}): ${err.message}`);
+  }
+  return true;
+}
+
 /** Registra los comandos en un servidor (aparecen al instante, sin esperar 1 h). */
 async function registrarEn(guild) {
   try {
@@ -87,7 +106,8 @@ client.once(Events.ClientReady, async (c) => {
   ponerEstado();
   setInterval(ponerEstado, CAMBIO_ESTADO_MS).unref();
 
-  for (const guild of c.guilds.cache.values()) {
+  for (const guild of [...c.guilds.cache.values()]) {
+    if (await salirSiNoAutorizado(guild)) continue;
     await registrarEn(guild);
   }
 
@@ -107,10 +127,14 @@ client.once(Events.ClientReady, async (c) => {
   console.log(`Listo en ${c.guilds.cache.size} servidor(es).`);
 });
 
-client.on(Events.GuildCreate, (guild) => registrarEn(guild));
+// Si alguien mete el bot en otro servidor, se sale en el acto
+client.on(Events.GuildCreate, async (guild) => {
+  if (await salirSiNoAutorizado(guild)) return;
+  await registrarEn(guild);
+});
 
 client.on(Events.InteractionCreate, async (interaction) => {
-  if (!interaction.inGuild()) return;
+  if (!interaction.inGuild() || !autorizado(interaction.guildId)) return;
 
   // Slash commands, y botones/menús de los paneles con el permiso de su comando
   let comando;
@@ -144,6 +168,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 });
 
 client.on(Events.MessageCreate, async (message) => {
+  if (!autorizado(message.guildId)) return;
   try {
     await manejarMensaje(message);
   } catch (err) {

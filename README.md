@@ -62,6 +62,10 @@ En el canal donde quieras contar:
 
 Y ya. La gente escribe `1`, `2`, `3`… el bot reacciona con el check a cada acierto.
 
+## Servidor autorizado
+
+El bot solo funciona en el servidor `1155074712402149437`. Si está en cualquier otro (al arrancar) o alguien lo mete después, **se sale solo** y lo apunta en la consola. Para autorizar otro, añade su ID a `SERVIDORES_AUTORIZADOS` en `src/index.js`.
+
 ## Comandos
 
 | Comando | Quién | Qué hace |
